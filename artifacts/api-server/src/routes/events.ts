@@ -280,6 +280,7 @@ router.patch("/events/:token", requireHost, async (req, res): Promise<void> => {
     itinerary,
     settlementMode,
     coverImage,
+    bannerImage,
     frozen,
   } = req.body ?? {};
 
@@ -295,6 +296,7 @@ router.patch("/events/:token", requireHost, async (req, res): Promise<void> => {
     updates.settlementMode = settlementMode;
   }
   if (coverImage !== undefined) updates.coverImage = coverImage;
+  if (bannerImage !== undefined) updates.bannerImage = bannerImage;
   if (typeof frozen === "boolean") updates.frozen = frozen;
 
   if (Object.keys(updates).length === 0) {

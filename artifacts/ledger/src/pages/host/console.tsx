@@ -454,7 +454,8 @@ function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: st
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     description: '', venue: '', address: '', mapsLink: '',
-    startDate: '', endDate: '', itinerary: '', settlementMode: 'individual' as 'individual' | 'house',
+    startDate: '', endDate: '', itinerary: '', bannerImage: '',
+    settlementMode: 'individual' as 'individual' | 'house',
   });
   const [loaded, setLoaded] = useState(false);
 
@@ -471,6 +472,7 @@ function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: st
           startDate: data.startDate ? new Date(data.startDate).toISOString().slice(0, 16) : '',
           endDate: data.endDate ? new Date(data.endDate).toISOString().slice(0, 16) : '',
           itinerary: data.itinerary ?? '',
+          bannerImage: data.bannerImage ?? '',
           settlementMode: data.settlementMode ?? 'individual',
         });
         setLoaded(true);
@@ -493,11 +495,13 @@ function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: st
           startDate: form.startDate || null,
           endDate: form.endDate || null,
           itinerary: form.itinerary || null,
+          bannerImage: form.bannerImage || null,
           settlementMode: form.settlementMode,
         }),
       });
       if (!res.ok) throw new Error();
       queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/events/${eventToken}`] });
       toast.success('Event details saved.');
       onClose();
     } catch {
@@ -510,8 +514,21 @@ function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: st
   return (
     <form onSubmit={handleSave} className="space-y-4 pt-1 max-h-[65dvh] overflow-y-auto">
       <div className="space-y-1.5">
-        <Label>Description</Label>
-        <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What's the occasion?" />
+        <Label>Description <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+        <textarea
+          value={form.description}
+          onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+          placeholder="What's the occasion? A sentence or two is plenty."
+          maxLength={500}
+          rows={3}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+        />
+        <p className="text-xs text-muted-foreground text-right">{form.description.length}/500</p>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Banner image URL <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
+        <Input value={form.bannerImage} onChange={e => setForm(f => ({ ...f, bannerImage: e.target.value }))} placeholder="https://…" type="url" />
+        <p className="text-xs text-muted-foreground">Shown as a hero image at the top of the event page.</p>
       </div>
       <div className="space-y-1.5">
         <Label>Venue</Label>
@@ -804,6 +821,81 @@ function EventsTab({ hostToken }: { hostToken: string }) {
   );
 }
 
+// ─── Settings Tab ──────────────────────────────────────────────────────────────
+function SettingsTab({ hostToken }: { hostToken: string }) {
+  const [note, setNote] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (loaded) return;
+    fetch(`${import.meta.env.BASE_URL}api/settings/skipper_note`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.value) setNote(data.value);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
+  }, [loaded]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/settings/skipper_note`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+        body: JSON.stringify({ value: note }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success('Skipper\'s Note saved.');
+    } catch {
+      toast.error('Could not save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!loaded) return <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>;
+
+  return (
+    <div className="space-y-6">
+      <form onSubmit={handleSave} className="space-y-4">
+        <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Skipper's Note</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Shown on the login page as an editorial card. Leave blank to hide it.
+            </p>
+          </div>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="e.g. Roads are clear — see you all tonight! Dress warm, it's a cold one."
+            maxLength={500}
+            rows={4}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+          />
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">{note.length}/500</p>
+            <div className="flex gap-2">
+              {note && (
+                <Button type="button" variant="ghost" size="sm" className="text-muted-foreground"
+                  onClick={() => setNote('')}>
+                  Clear
+                </Button>
+              )}
+              <Button type="submit" size="sm" disabled={saving}>
+                {saving ? 'Saving…' : 'Save Note'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 // ─── Main Console ──────────────────────────────────────────────────────────────
 export default function StewardsDeskPage() {
   const [, setLocation] = useLocation();
@@ -836,6 +928,7 @@ export default function StewardsDeskPage() {
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="people">Directory</TabsTrigger>
             <TabsTrigger value="houses">Houses</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           <TabsContent value="events">
             <EventsTab hostToken={hostToken} />
@@ -845,6 +938,9 @@ export default function StewardsDeskPage() {
           </TabsContent>
           <TabsContent value="houses">
             <HousesTab hostToken={hostToken} />
+          </TabsContent>
+          <TabsContent value="settings">
+            <SettingsTab hostToken={hostToken} />
           </TabsContent>
         </Tabs>
       </main>

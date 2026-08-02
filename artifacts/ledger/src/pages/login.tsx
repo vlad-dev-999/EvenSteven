@@ -6,19 +6,11 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useSearch } from 'wouter';
 import { toast } from 'sonner';
-import { useGetIdentityOptions } from '@workspace/api-client-react';
-import type { IdentityMember } from '@workspace/api-client-react';
 import { usePersonSession } from '@/hooks/use-person-session';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-
-// identity-options uses a token to scope the event, but for global login we
-// use a sentinel token "~" which the API still calls to list all directory
-// people (the event-scoping only affects `inEvent` flag). We pass a dummy
-// token and the backend returns all active directory people regardless.
-// Actually — we'll just call /api/houses + /api/people directly.
 
 function getInitials(name: string) {
   return name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
@@ -85,6 +77,7 @@ export default function LoginPage() {
 
   const [houses, setHouses] = useState<HouseGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [skipperNote, setSkipperNote] = useState<string | null>(null);
   const [expandedHouseId, setExpandedHouseId] = useState<number | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<HouseGroup['members'][0] | null>(null);
   const [pinInput, setPinInput] = useState('');
@@ -98,15 +91,20 @@ export default function LoginPage() {
   }, [session, redirect, setLocation]);
 
   useEffect(() => {
-    fetchDirectory()
-      .then(setHouses)
+    Promise.all([
+      fetchDirectory(),
+      fetch(`${import.meta.env.BASE_URL}api/settings/skipper_note`).then(r => r.ok ? r.json() : null),
+    ])
+      .then(([dirs, noteData]) => {
+        setHouses(dirs);
+        if (noteData?.value) setSkipperNote(noteData.value);
+      })
       .catch(() => toast.error('Could not load the directory. Please try again.'))
       .finally(() => setLoading(false));
   }, []);
 
   const handlePersonTap = (person: HouseGroup['members'][0]) => {
     if (!person.activated && !person.hasPin) {
-      // Not activated at all — go to activation flow
       setLocation(`/activate?personId=${person.id}&name=${encodeURIComponent(person.name)}&houseId=${person.houseId}&redirect=${encodeURIComponent(redirect)}`);
       return;
     }
@@ -260,6 +258,19 @@ export default function LoginPage() {
             })}
           </div>
         )}
+
+        {/* Skipper's Note — editorial card, hidden when empty */}
+        {skipperNote && (
+          <div className="rounded-xl border border-border bg-card/60 px-5 py-4 space-y-1.5">
+            <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground/70">
+              A note from the Skipper
+            </p>
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{skipperNote}</p>
+          </div>
+        )}
+
+        {/* Spacer so Skipper button doesn't overlap content */}
+        <div className="h-8" />
       </div>
 
       {/* Skipper footer — administrator entry */}

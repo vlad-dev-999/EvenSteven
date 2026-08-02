@@ -10,6 +10,7 @@ import joinRequestsRouter from "./joinRequests";
 import expensesRouter from "./expenses";
 import settlementsRouter from "./settlements";
 import directoryRouter from "./directory";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(familiesRouter);
 router.use(joinRequestsRouter);
 router.use(expensesRouter);
 router.use(settlementsRouter);
+router.use(settingsRouter);
 
 export default router;

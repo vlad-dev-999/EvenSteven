@@ -7,3 +7,4 @@ export * from "./expenses";
 export * from "./expenseParticipants";
 export * from "./joinRequests";
 export * from "./activityLog";
+export * from "./appSettings";

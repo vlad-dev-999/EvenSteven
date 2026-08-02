@@ -11,7 +11,7 @@ import { useLocalSession } from '@/hooks/use-local-session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
-import { Share2, Link2, MapPin, FileText, BarChart2, QrCode, X } from 'lucide-react';
+import { Share2, Link2, MapPin, FileText, BarChart2, QrCode } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
   tickets: '🎟', food: '🍽', drinks: '🥂', snacks: '🍿', fuel: '⛽', other: '📦',
@@ -69,10 +69,8 @@ function ShareSheet({ open, onClose, event, expenses, settlements, balancesData,
         if (e.name === 'AbortError') return;
       }
     }
-    // Fallback: copy to clipboard
     const content = url ? `${text}\n${url}` : text;
     await navigator.clipboard.writeText(content);
-    // Brief visual feedback via the dialog stays open
   };
 
   const buildAnnouncement = () => {
@@ -257,6 +255,33 @@ function ShareSheet({ open, onClose, event, expenses, settlements, balancesData,
   );
 }
 
+// ─── Banner Hero ───────────────────────────────────────────────────────────────
+function EventBanner({ event }: { event: any }) {
+  if (!event?.bannerImage) return null;
+
+  return (
+    <div className="relative w-full overflow-hidden rounded-xl" style={{ height: '200px' }}>
+      <img
+        src={event.bannerImage}
+        alt={event.name}
+        className="w-full h-full object-cover"
+      />
+      {/* Gradient overlay */}
+      <div
+        className="absolute inset-0"
+        style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)' }}
+      />
+      {/* Text overlay */}
+      <div className="absolute bottom-0 left-0 right-0 px-4 pb-4">
+        <h2 className="font-display text-2xl text-white leading-tight drop-shadow">{event.name}</h2>
+        {event.hostMemberName && (
+          <p className="text-sm text-white/80 drop-shadow">Hosted by {event.hostMemberName}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard Page ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { token } = useParams<{ token: string }>();
@@ -298,10 +323,12 @@ export default function DashboardPage() {
     );
   }
 
+  const ev = event as any;
   const myBalance = balancesData?.memberBalances.find(b => b.memberId === session.memberId);
   const netBalance = myBalance?.netBalance ?? 0;
   const recentExpenses = expenses.slice(-5).reverse();
   const recentActivity = activity.slice(-10).reverse();
+  const hasBanner = !!ev?.bannerImage;
 
   return (
     <div className="min-h-dvh bg-background transition-page">
@@ -330,6 +357,33 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6 pb-24">
+        {/* Banner hero — shown when bannerImage is set */}
+        {hasBanner && <EventBanner event={ev} />}
+
+        {/* Below-banner identity strip — always shown when banner present */}
+        {hasBanner && (
+          <div className="space-y-0.5">
+            <h2 className="font-display text-2xl text-foreground">{ev.name}</h2>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+              {ev.hostMemberName && <span>Hosted by {ev.hostMemberName}</span>}
+              {ev.startDate && (
+                <span>
+                  {new Date(ev.startDate).toLocaleDateString('en-IN', {
+                    weekday: 'short', day: 'numeric', month: 'short',
+                  })}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Event description — shown beneath title/banner if set */}
+        {ev?.description && (
+          <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+            {ev.description}
+          </p>
+        )}
+
         {/* Balance card */}
         <div className={cn(
           'rounded-xl border bg-card p-5 space-y-1',
@@ -377,22 +431,22 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Event details strip */}
-        {((event as any)?.venue || (event as any)?.startDate) && (
+        {/* Event details strip — venue/date (only when no banner, to avoid redundancy) */}
+        {!hasBanner && (ev?.venue || ev?.startDate) && (
           <div className="rounded-xl border border-border bg-card px-4 py-3 space-y-1 text-sm">
-            {(event as any)?.venue && (
+            {ev?.venue && (
               <p className="text-muted-foreground flex items-center gap-2">
-                <span>📍</span> {(event as any).venue}
-                {(event as any)?.mapsLink && (
-                  <a href={(event as any).mapsLink} target="_blank" rel="noopener noreferrer"
+                <span>📍</span> {ev.venue}
+                {ev?.mapsLink && (
+                  <a href={ev.mapsLink} target="_blank" rel="noopener noreferrer"
                     className="text-accent underline underline-offset-2 ml-auto text-xs">Map</a>
                 )}
               </p>
             )}
-            {(event as any)?.startDate && (
+            {ev?.startDate && (
               <p className="text-muted-foreground flex items-center gap-2">
                 <span>📅</span>
-                {new Date((event as any).startDate).toLocaleDateString('en-IN', {
+                {new Date(ev.startDate).toLocaleDateString('en-IN', {
                   weekday: 'short', day: 'numeric', month: 'short',
                 })}
               </p>
