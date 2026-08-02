@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 
 /**
  * Generates a cryptographically random URL-safe token (16 bytes = 22 base64url chars)
@@ -8,8 +8,9 @@ export function generateToken(): string {
 }
 
 /**
- * Generates a random 4-digit PIN
+ * Generates a cryptographically secure random 4-digit PIN (1000–9999).
  */
 export function generatePin(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  // randomInt(min, max) is cryptographically secure (CSPRNG)
+  return String(randomInt(1000, 10000));
 }

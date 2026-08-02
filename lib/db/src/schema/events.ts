@@ -8,6 +8,17 @@ export const eventsTable = pgTable("events", {
   token: text("token").notNull().unique(),
   pin: text("pin").notNull(),
   frozen: boolean("frozen").notNull().default(false),
+  // Event details
+  coverImage: text("cover_image"),
+  description: text("description"),
+  venue: text("venue"),
+  address: text("address"),
+  mapsLink: text("maps_link"),
+  startDate: timestamp("start_date", { withTimezone: true }),
+  endDate: timestamp("end_date", { withTimezone: true }),
+  itinerary: text("itinerary"),
+  // Settlement configuration
+  settlementMode: text("settlement_mode").notNull().default("individual"), // "individual" | "house"
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

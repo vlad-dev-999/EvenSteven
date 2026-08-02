@@ -1,14 +1,17 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams, Link } from 'wouter';
 import {
   useGetEvent,
   useGetBalances,
   useListExpenses,
   useListActivity,
+  useGetSettlements,
 } from '@workspace/api-client-react';
 import { useLocalSession } from '@/hooks/use-local-session';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
+import { Share2, Link2, MapPin, FileText, BarChart2, QrCode, X } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
   tickets: '🎟', food: '🍽', drinks: '🥂', snacks: '🍿', fuel: '⛽', other: '📦',
@@ -17,9 +20,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 const ACTION_HEADLINES: Record<string, (meta: any) => string> = {
   event_created: (m) => `${m.hostName ?? 'The host'} started the evening.`,
   expense_added: (m) => `${m.paidByName ?? 'Someone'} covered the ${m.category ?? 'expense'}.`,
-  expense_updated: (m) => `The ${m.category ?? 'expense'} was updated.`,
-  expense_deleted: (m) => `An expense was removed.`,
+  expense_updated: () => 'An expense was updated.',
+  expense_edited: () => 'An expense was updated.',
+  expense_deleted: () => 'An expense was removed.',
   member_removed: (m) => `${m.memberName ?? 'A member'} left the event.`,
+  member_joined: (m) => `${m.name ?? 'Someone'} joined the party.`,
+  member_approved: (m) => `${m.name ?? 'Someone'} joined the party.`,
   event_frozen: () => 'The evening is closed.',
   event_unfrozen: () => 'The evening was reopened.',
   join_request_approved: (m) => `${m.name ?? 'Someone'} joined the party.`,
@@ -31,14 +37,232 @@ const ACTION_CAPTIONS: Record<string, (meta: any) => string> = {
     m.amount && formatCurrency(m.amount),
     m.splitType && `Split ${m.splitType}`,
   ].filter(Boolean).join(' · '),
-  expense_updated: (m) => `Amount: ${m.amount ? formatCurrency(m.amount) : '—'}`,
+  expense_edited: (m) => `Amount: ${m.newAmount ? formatCurrency(m.newAmount) : '—'}`,
   event_created: (m) => `Event "${m.eventName}" created.`,
 };
 
+// ─── Share Sheet ───────────────────────────────────────────────────────────────
+interface ShareSheetProps {
+  open: boolean;
+  onClose: () => void;
+  event: any;
+  expenses: any[];
+  settlements: any[];
+  balancesData: any;
+  token: string;
+}
+
+function ShareSheet({ open, onClose, event, expenses, settlements, balancesData, token }: ShareSheetProps) {
+  const [qrOpen, setQrOpen] = useState(false);
+
+  const eventUrl = `${window.location.origin}${import.meta.env.BASE_URL}e/${token}`;
+  const eventName = event?.name ?? 'Event';
+
+  const canNativeShare = typeof navigator.share === 'function';
+
+  const share = async (text: string, url?: string, title?: string) => {
+    if (canNativeShare) {
+      try {
+        await navigator.share({ title: title ?? eventName, text, url });
+        return;
+      } catch (e: any) {
+        if (e.name === 'AbortError') return;
+      }
+    }
+    // Fallback: copy to clipboard
+    const content = url ? `${text}\n${url}` : text;
+    await navigator.clipboard.writeText(content);
+    // Brief visual feedback via the dialog stays open
+  };
+
+  const buildAnnouncement = () => {
+    const parts = [`📢 ${eventName} is happening!`];
+    if (event?.venue) parts.push(`📍 ${event.venue}`);
+    if (event?.address) parts.push(event.address);
+    if (event?.startDate) {
+      const d = new Date(event.startDate);
+      parts.push(`📅 ${d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`);
+    }
+    if (event?.description) parts.push(`\n${event.description}`);
+    parts.push(`\n🔗 ${eventUrl}`);
+    return parts.join('\n');
+  };
+
+  const buildExpenseDetails = () => {
+    const total = expenses.reduce((s: number, e: any) => s + e.amount, 0);
+    const lines = [`💸 Expense breakdown for ${eventName}`, `Total: ${formatCurrency(total)}`, ''];
+    expenses.forEach((e: any) => {
+      lines.push(`${CATEGORY_LABELS[e.category] ?? '📦'} ${e.description ?? e.category} — ${formatCurrency(e.amount)} (paid by ${e.paidByMemberName})`);
+    });
+    return lines.join('\n');
+  };
+
+  const buildSettlementSummary = () => {
+    if (settlements.length === 0) return `✅ ${eventName}: Everyone is settled up!`;
+    const lines = [`💰 Settlement plan for ${eventName}`, ''];
+    settlements.forEach((s: any) => {
+      lines.push(`${s.fromMemberName} → ${s.toMemberName}: ${formatCurrency(s.amount)}`);
+    });
+    return lines.join('\n');
+  };
+
+  const buildEventDetails = () => {
+    const lines = [`📋 ${eventName}`];
+    if (event?.description) lines.push(`\n${event.description}`);
+    if (event?.venue) lines.push(`\n📍 Venue: ${event.venue}`);
+    if (event?.address) lines.push(`📌 ${event.address}`);
+    if (event?.startDate) {
+      const d = new Date(event.startDate);
+      lines.push(`📅 ${d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`);
+    }
+    if (event?.endDate) {
+      const d = new Date(event.endDate);
+      lines.push(`🏁 Ends: ${d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}`);
+    }
+    if (event?.itinerary) lines.push(`\n📝 Itinerary:\n${event.itinerary}`);
+    lines.push(`\n🔗 ${eventUrl}`);
+    return lines.join('\n');
+  };
+
+  const buildEventSummary = () => {
+    const totalExpenses = balancesData?.totalExpenses ?? 0;
+    const memberCount = balancesData?.memberBalances?.length ?? 0;
+    const perPerson = memberCount > 0 ? Math.round(totalExpenses / memberCount) : 0;
+    const lines = [
+      `📊 ${eventName} — Summary`,
+      '',
+      `Total spent: ${formatCurrency(totalExpenses)}`,
+      `Members: ${memberCount}`,
+      `Per person avg: ${formatCurrency(perPerson)}`,
+      `Settlements needed: ${settlements.length}`,
+    ];
+    return lines.join('\n');
+  };
+
+  const SHARE_OPTIONS = [
+    {
+      icon: '📢',
+      label: 'Announcement',
+      description: 'Share event details publicly',
+      action: () => share(buildAnnouncement()),
+    },
+    {
+      icon: '🎟',
+      label: 'Invite to Event',
+      description: 'Send the event join link',
+      action: () => share(`You're invited to ${eventName}!\nJoin the group tab and track expenses together.`, eventUrl, `Join ${eventName}`),
+    },
+    {
+      icon: <Link2 size={16} />,
+      label: 'Event Link',
+      description: 'Copy or share the URL',
+      action: () => share(eventUrl),
+    },
+    ...(event?.mapsLink ? [{
+      icon: <MapPin size={16} />,
+      label: 'Event Location',
+      description: 'Share on Google Maps',
+      action: () => share(`📍 ${eventName} is at ${event.venue ?? 'our venue'}`, event.mapsLink),
+    }] : []),
+    ...(event?.venue || event?.itinerary ? [{
+      icon: <FileText size={16} />,
+      label: 'Event Details & Itinerary',
+      description: 'Venue, dates, and schedule',
+      action: () => share(buildEventDetails()),
+    }] : []),
+    {
+      icon: '💸',
+      label: 'Expense Details',
+      description: `${expenses.length} expenses · ${formatCurrency(expenses.reduce((s: number, e: any) => s + e.amount, 0))} total`,
+      action: () => share(buildExpenseDetails()),
+    },
+    {
+      icon: '💰',
+      label: 'Settlement Summary',
+      description: `${settlements.length} transfers to settle up`,
+      action: () => share(buildSettlementSummary()),
+    },
+    {
+      icon: <BarChart2 size={16} />,
+      label: 'Event Summary',
+      description: 'Totals and averages',
+      action: () => share(buildEventSummary()),
+    },
+    {
+      icon: <QrCode size={16} />,
+      label: 'Event QR Code',
+      description: 'Scan to join the event',
+      action: () => setQrOpen(true),
+    },
+  ];
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&bgcolor=ffffff&data=${encodeURIComponent(eventUrl)}`;
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="max-w-sm max-h-[85dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-normal">Share</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1 pt-1">
+            {SHARE_OPTIONS.map((opt, i) => (
+              <button
+                key={i}
+                onClick={async () => { await opt.action(); }}
+                className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-muted/50 transition-colors text-left"
+              >
+                <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm shrink-0">
+                  {typeof opt.icon === 'string' ? opt.icon : opt.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">{opt.label}</p>
+                  <p className="text-xs text-muted-foreground truncate">{opt.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* QR Code dialog */}
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-display text-xl font-normal text-center">
+              {eventName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-2">
+            <img
+              src={qrUrl}
+              alt="Event QR code"
+              className="w-48 h-48 rounded-lg border border-border"
+            />
+            <p className="text-xs text-muted-foreground text-center">
+              Scan to join {eventName}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => share(eventUrl)}
+              className="w-full"
+            >
+              Share link instead
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+// ─── Dashboard Page ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { token } = useParams<{ token: string }>();
   const [, setLocation] = useLocation();
-  const { session, setSession } = useLocalSession(token ?? '');
+  const { session } = useLocalSession(token ?? '');
+  const [shareOpen, setShareOpen] = useState(false);
 
   const { data: event, isLoading: eventLoading } = useGetEvent(token ?? '', {
     query: { enabled: !!token } as any,
@@ -53,6 +277,10 @@ export default function DashboardPage() {
   });
 
   const { data: activity = [] } = useListActivity(token ?? '', {
+    query: { enabled: !!token } as any,
+  });
+
+  const { data: settlements = [] } = useGetSettlements(token ?? '', {
     query: { enabled: !!token } as any,
   });
 
@@ -84,7 +312,14 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">EvenSteven</p>
             <h1 className="font-display text-xl text-foreground truncate">{event?.name ?? '…'}</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShareOpen(true)}
+              className="p-2 rounded-md hover:bg-muted/40 transition-colors text-muted-foreground hover:text-foreground"
+              title="Share"
+            >
+              <Share2 size={17} />
+            </button>
             <Link href={`/e/${token}/settings`}>
               <Button size="sm" variant="ghost" className="text-xs">
                 {session.memberName}
@@ -142,6 +377,29 @@ export default function DashboardPage() {
           ))}
         </div>
 
+        {/* Event details strip */}
+        {((event as any)?.venue || (event as any)?.startDate) && (
+          <div className="rounded-xl border border-border bg-card px-4 py-3 space-y-1 text-sm">
+            {(event as any)?.venue && (
+              <p className="text-muted-foreground flex items-center gap-2">
+                <span>📍</span> {(event as any).venue}
+                {(event as any)?.mapsLink && (
+                  <a href={(event as any).mapsLink} target="_blank" rel="noopener noreferrer"
+                    className="text-accent underline underline-offset-2 ml-auto text-xs">Map</a>
+                )}
+              </p>
+            )}
+            {(event as any)?.startDate && (
+              <p className="text-muted-foreground flex items-center gap-2">
+                <span>📅</span>
+                {new Date((event as any).startDate).toLocaleDateString('en-IN', {
+                  weekday: 'short', day: 'numeric', month: 'short',
+                })}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Recent expenses */}
         <section className="space-y-3">
           <div className="flex items-center justify-between">
@@ -154,7 +412,6 @@ export default function DashboardPage() {
               </Link>
             )}
           </div>
-
           {recentExpenses.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-6 text-center space-y-1.5">
               <p className="font-display text-xl text-foreground">The evening is still financially innocent.</p>
@@ -182,10 +439,7 @@ export default function DashboardPage() {
 
         {/* Timeline */}
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            Timeline
-          </h2>
-
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Timeline</h2>
           {recentActivity.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-6 text-center space-y-1.5">
               <p className="font-display text-xl text-foreground">Quiet so far.</p>
@@ -198,7 +452,7 @@ export default function DashboardPage() {
                 const caption = ACTION_CAPTIONS[entry.action]?.(entry.metadata ?? {});
                 return (
                   <div key={entry.id} className="flex gap-3">
-                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-accent shrink-0 mt-[7px]" />
+                    <div className="mt-[7px] w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
                     <div className="flex-1 space-y-0.5">
                       <p className="text-sm text-foreground leading-snug">{headline}</p>
                       {caption && <p className="text-xs text-muted-foreground">{caption}</p>}
@@ -212,19 +466,28 @@ export default function DashboardPage() {
         </section>
       </main>
 
-      {/* FAB */}
-      {!event?.frozen && (
-        <div className="fixed bottom-6 right-6 z-20">
+      {/* FABs */}
+      <div className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-3">
+        {!event?.frozen && (
           <Link href={`/e/${token}/add-expense`}>
-            <button
-              className="h-14 px-5 rounded-full bg-primary text-primary-foreground font-medium text-sm shadow-lg hover:shadow-xl hover:opacity-90 transition-all flex items-center gap-2"
-            >
+            <button className="h-14 px-5 rounded-full bg-primary text-primary-foreground font-medium text-sm shadow-lg hover:shadow-xl hover:opacity-90 transition-all flex items-center gap-2">
               <span className="text-lg leading-none">+</span>
               Add Expense
             </button>
           </Link>
-        </div>
-      )}
+        )}
+      </div>
+
+      {/* Share sheet */}
+      <ShareSheet
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        event={event}
+        expenses={expenses}
+        settlements={settlements as any[]}
+        balancesData={balancesData}
+        token={token ?? ''}
+      />
     </div>
   );
 }

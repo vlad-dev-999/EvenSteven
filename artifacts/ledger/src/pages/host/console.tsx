@@ -12,6 +12,10 @@ import {
   useDeletePerson,
   useListEvents,
   useCreateEvent,
+  useListMembers,
+  useGetBalances,
+  useGetSettlements,
+  useGetEventSummary,
 } from '@workspace/api-client-react';
 import type { House, Person } from '@workspace/api-client-react';
 import { useHostSession } from '@/hooks/use-host-session';
@@ -21,10 +25,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
+import { ArrowRight, Users, TrendingUp, CheckCircle } from 'lucide-react';
 
-// ─── Icon accent swatches ──────────────────────────────────────────────────────
 const CREST_OPTIONS = [
   { value: 'home', label: '🏠' },
   { value: 'star', label: '⭐' },
@@ -58,46 +61,23 @@ function HousesTab({ hostToken }: { hostToken: string }) {
   const [editing, setEditing] = useState<House | null>(null);
   const [form, setForm] = useState({ name: '', crest: 'home', accentColor: ACCENT_OPTIONS[0] });
 
-  const openAdd = () => {
-    setEditing(null);
-    setForm({ name: '', crest: 'home', accentColor: ACCENT_OPTIONS[0] });
-    setShowDialog(true);
-  };
-  const openEdit = (h: House) => {
-    setEditing(h);
-    setForm({ name: h.name, crest: h.crest, accentColor: h.accentColor ?? ACCENT_OPTIONS[0] });
-    setShowDialog(true);
-  };
+  const openAdd = () => { setEditing(null); setForm({ name: '', crest: 'home', accentColor: ACCENT_OPTIONS[0] }); setShowDialog(true); };
+  const openEdit = (h: House) => { setEditing(h); setForm({ name: h.name, crest: h.crest, accentColor: h.accentColor ?? ACCENT_OPTIONS[0] }); setShowDialog(true); };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = { name: form.name.trim(), crest: form.crest, accentColor: form.accentColor };
     if (editing) {
-      updateMutation.mutate({ id: editing.id, data }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['/api/houses'] });
-          setShowDialog(false);
-          toast.success(`${form.name} updated.`);
-        },
-      });
+      updateMutation.mutate({ id: editing.id, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/houses'] }); setShowDialog(false); toast.success(`${form.name} updated.`); } });
     } else {
-      createMutation.mutate({ data }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['/api/houses'] });
-          setShowDialog(false);
-          toast.success(`${form.name} added.`);
-        },
-      });
+      createMutation.mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/houses'] }); setShowDialog(false); toast.success(`${form.name} added.`); } });
     }
   };
 
   const handleDelete = (h: House) => {
     if (!confirm(`Delete ${h.name}? This cannot be undone.`)) return;
     deleteMutation.mutate({ id: h.id }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['/api/houses'] });
-        toast.success(`${h.name} removed.`);
-      },
+      onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/houses'] }); toast.success(`${h.name} removed.`); },
       onError: () => toast.error('Could not delete — people may still belong to this house.'),
     });
   };
@@ -110,21 +90,18 @@ function HousesTab({ hostToken }: { hostToken: string }) {
         <p className="text-sm text-muted-foreground">{houses.length} {houses.length === 1 ? 'house' : 'houses'}</p>
         <Button size="sm" onClick={openAdd}>Add House</Button>
       </div>
-
       {houses.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
-          <p className="font-display text-2xl text-foreground">No houses yet.</p>
+          <p className="font-display text-2xl">No houses yet.</p>
           <p className="text-sm text-muted-foreground">Add the households in your group.</p>
         </div>
       ) : (
         <div className="space-y-2">
           {houses.map(h => (
-            <div key={h.id}
-              className="flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3"
-              style={{ borderLeftWidth: '3px', borderLeftColor: h.accentColor ?? 'hsl(var(--accent))' }}
-            >
+            <div key={h.id} className="flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3"
+              style={{ borderLeftWidth: '3px', borderLeftColor: h.accentColor ?? 'hsl(var(--accent))' }}>
               <span className="text-xl">{getCrestEmoji(h.crest)}</span>
-              <span className="flex-1 font-medium text-foreground">{h.name}</span>
+              <span className="flex-1 font-medium">{h.name}</span>
               <div className="flex gap-2">
                 <Button size="sm" variant="ghost" onClick={() => openEdit(h)}>Edit</Button>
                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(h)}>Delete</Button>
@@ -133,38 +110,24 @@ function HousesTab({ hostToken }: { hostToken: string }) {
           ))}
         </div>
       )}
-
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">
-              {editing ? 'Edit House' : 'Add House'}
-            </DialogTitle>
+            <DialogTitle className="font-display text-2xl font-normal">{editing ? 'Edit House' : 'Add House'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label>Name</Label>
-              <Input
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. House Vlad"
-                required
-                autoFocus
-              />
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. House Vlad" required autoFocus />
             </div>
             <div className="space-y-1.5">
               <Label>Crest</Label>
               <div className="flex flex-wrap gap-2">
                 {CREST_OPTIONS.map(c => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, crest: c.value }))}
-                    className={cn(
-                      'text-xl p-2 rounded-lg border-2 transition-colors',
-                      form.crest === c.value ? 'border-accent bg-accent/10' : 'border-transparent hover:border-border'
-                    )}
-                  >{c.label}</button>
+                  <button key={c.value} type="button" onClick={() => setForm(f => ({ ...f, crest: c.value }))}
+                    className={cn('text-xl p-2 rounded-lg border-2 transition-colors', form.crest === c.value ? 'border-accent bg-accent/10' : 'border-transparent hover:border-border')}>
+                    {c.label}
+                  </button>
                 ))}
               </div>
             </div>
@@ -172,24 +135,15 @@ function HousesTab({ hostToken }: { hostToken: string }) {
               <Label>Accent Colour</Label>
               <div className="flex flex-wrap gap-2">
                 {ACCENT_OPTIONS.map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, accentColor: c }))}
-                    className={cn(
-                      'w-7 h-7 rounded-full border-2 transition-all',
-                      form.accentColor === c ? 'border-foreground scale-110' : 'border-transparent'
-                    )}
-                    style={{ backgroundColor: c }}
-                  />
+                  <button key={c} type="button" onClick={() => setForm(f => ({ ...f, accentColor: c }))}
+                    className={cn('w-7 h-7 rounded-full border-2 transition-all', form.accentColor === c ? 'border-foreground scale-110' : 'border-transparent')}
+                    style={{ backgroundColor: c }} />
                 ))}
               </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {editing ? 'Save' : 'Add'}
-              </Button>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>{editing ? 'Save' : 'Add'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -213,55 +167,25 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
   const [editing, setEditing] = useState<Person | null>(null);
   const [form, setForm] = useState({ name: '', houseId: 0, active: true });
 
-  const openAdd = () => {
-    setEditing(null);
-    setForm({ name: '', houseId: houses[0]?.id ?? 0, active: true });
-    setShowDialog(true);
-  };
-  const openEdit = (p: Person) => {
-    setEditing(p);
-    setForm({ name: p.name, houseId: p.houseId, active: p.active });
-    setShowDialog(true);
-  };
+  const openAdd = () => { setEditing(null); setForm({ name: '', houseId: houses[0]?.id ?? 0, active: true }); setShowDialog(true); };
+  const openEdit = (p: Person) => { setEditing(p); setForm({ name: p.name, houseId: p.houseId, active: p.active }); setShowDialog(true); };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const data = { name: form.name.trim(), houseId: form.houseId, active: form.active };
     if (editing) {
-      updateMutation.mutate({ id: editing.id, data }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['/api/people'] });
-          setShowDialog(false);
-          toast.success(`${form.name} updated.`);
-        },
-      });
+      updateMutation.mutate({ id: editing.id, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); setShowDialog(false); toast.success(`${form.name} updated.`); } });
     } else {
-      createMutation.mutate({ data }, {
-        onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['/api/people'] });
-          setShowDialog(false);
-          toast.success(`${form.name} added.`);
-        },
-      });
+      createMutation.mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); setShowDialog(false); toast.success(`${form.name} added.`); } });
     }
   };
 
   const handleDelete = (p: Person) => {
     if (!confirm(`Remove ${p.name}?`)) return;
-    deleteMutation.mutate({ id: p.id }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['/api/people'] });
-        toast.success(`${p.name} removed.`);
-      },
-    });
+    deleteMutation.mutate({ id: p.id }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); toast.success(`${p.name} removed.`); } });
   };
 
-  // Group people by house
-  const grouped = houses.map(h => ({
-    house: h,
-    people: people.filter(p => p.houseId === h.id),
-  })).filter(g => g.people.length > 0);
-
+  const grouped = houses.map(h => ({ house: h, people: people.filter(p => p.houseId === h.id) })).filter(g => g.people.length > 0);
   const ungrouped = people.filter(p => !houses.some(h => h.id === p.houseId));
 
   if (peopleLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>;
@@ -272,16 +196,10 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
         <p className="text-sm text-muted-foreground">{people.length} {people.length === 1 ? 'person' : 'people'}</p>
         <Button size="sm" onClick={openAdd} disabled={houses.length === 0}>Add Person</Button>
       </div>
-
-      {houses.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          Add at least one house before adding people.
-        </p>
-      )}
-
+      {houses.length === 0 && <p className="text-sm text-muted-foreground text-center py-4">Add at least one house before adding people.</p>}
       {people.length === 0 && houses.length > 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
-          <p className="font-display text-2xl text-foreground">No people yet.</p>
+          <p className="font-display text-2xl">No people yet.</p>
           <p className="text-sm text-muted-foreground">Add the people who regularly join your evenings.</p>
         </div>
       ) : (
@@ -290,22 +208,15 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
             <div key={house.id} className="space-y-1.5">
               <div className="flex items-center gap-2 px-1">
                 <span className="text-sm">{getCrestEmoji(house.crest)}</span>
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  {house.name}
-                </span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{house.name}</span>
               </div>
               {hPeople.map(p => (
-                <div key={p.id}
-                  className={cn(
-                    'flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5',
-                    !p.active && 'opacity-50'
-                  )}
-                >
+                <div key={p.id} className={cn('flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5', !p.active && 'opacity-50')}>
                   <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-primary-foreground"
                     style={{ backgroundColor: house.accentColor ?? 'hsl(var(--primary))' }}>
                     {p.name[0].toUpperCase()}
                   </div>
-                  <span className="flex-1 text-sm font-medium text-foreground">{p.name}</span>
+                  <span className="flex-1 text-sm font-medium">{p.name}</span>
                   {!p.active && <span className="text-xs text-muted-foreground">inactive</span>}
                   <div className="flex gap-1">
                     <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Edit</Button>
@@ -317,65 +228,284 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
           ))}
           {ungrouped.map(p => (
             <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
-              <span className="flex-1 text-sm font-medium text-foreground">{p.name}</span>
+              <span className="flex-1 text-sm font-medium">{p.name}</span>
               <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Edit</Button>
             </div>
           ))}
         </div>
       )}
-
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">
-              {editing ? 'Edit Person' : 'Add Person'}
-            </DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle className="font-display text-2xl font-normal">{editing ? 'Edit Person' : 'Add Person'}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label>Name</Label>
-              <Input
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Mithun"
-                required
-                autoFocus
-              />
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mithun" required autoFocus />
             </div>
             <div className="space-y-1.5">
               <Label>House</Label>
-              <select
-                value={form.houseId}
-                onChange={e => setForm(f => ({ ...f, houseId: parseInt(e.target.value) }))}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                required
-              >
+              <select value={form.houseId} onChange={e => setForm(f => ({ ...f, houseId: parseInt(e.target.value) }))}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
                 <option value="">Select a house…</option>
-                {houses.map(h => (
-                  <option key={h.id} value={h.id}>{h.name}</option>
-                ))}
+                {houses.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="active"
-                checked={form.active}
-                onChange={e => setForm(f => ({ ...f, active: e.target.checked }))}
-                className="rounded"
-              />
+              <input type="checkbox" id="active" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} className="rounded" />
               <Label htmlFor="active" className="cursor-pointer">Active</Label>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
-                {editing ? 'Save' : 'Add'}
-              </Button>
+              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>{editing ? 'Save' : 'Add'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// ─── Event Overview Panel ──────────────────────────────────────────────────────
+function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToken: string }) {
+  const { data: members = [] } = useListMembers(eventToken, { query: { enabled: !!eventToken } as any });
+  const { data: balancesData } = useGetBalances(eventToken, { query: { enabled: !!eventToken } as any });
+  const { data: settlements = [] } = useGetSettlements(eventToken, { query: { enabled: !!eventToken } as any });
+  const { data: summary } = useGetEventSummary(eventToken, { query: { enabled: !!eventToken } as any });
+
+  const approved = members.filter(m => m.approved);
+  const claimed = members.filter(m => m.claimed);
+
+  // Group by house for member display
+  const houseMap = new Map<string, typeof members>();
+  const noHouse: typeof members = [];
+  for (const m of approved) {
+    const key = m.houseName ?? '__none__';
+    if (key === '__none__') { noHouse.push(m); continue; }
+    if (!houseMap.has(key)) houseMap.set(key, []);
+    houseMap.get(key)!.push(m);
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { icon: <Users size={14} />, label: 'Members', value: `${claimed.length}/${approved.length}` },
+          { icon: <TrendingUp size={14} />, label: 'Total Spent', value: formatCurrency(summary?.totalExpenses ?? 0) },
+          { icon: <CheckCircle size={14} />, label: 'Settlements', value: String((settlements as any[]).length) },
+        ].map((stat, i) => (
+          <div key={i} className="rounded-xl border border-border bg-card px-4 py-3 space-y-1">
+            <div className="flex items-center gap-1.5 text-muted-foreground">{stat.icon}<span className="text-xs">{stat.label}</span></div>
+            <p className="font-display text-2xl text-foreground">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Member roster */}
+      <div className="space-y-2">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Members</h3>
+        {Array.from(houseMap.entries()).map(([houseName, hMembers]) => {
+          const accentColor = hMembers[0]?.houseAccentColor ?? undefined;
+          return (
+            <div key={houseName} className="space-y-1">
+              <p className="text-xs text-muted-foreground px-1 font-medium">{houseName}</p>
+              {hMembers.map(m => {
+                const balance = balancesData?.memberBalances.find(b => b.memberId === m.id);
+                const net = balance?.netBalance ?? 0;
+                return (
+                  <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+                      style={{ backgroundColor: accentColor ?? 'hsl(var(--primary))' }}>
+                      {m.name[0].toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+                      <div className="flex items-center gap-2">
+                        {m.isHost && <span className="text-xs text-muted-foreground">host</span>}
+                        {m.claimed
+                          ? <span className="text-xs text-green-700">joined</span>
+                          : <span className="text-xs text-muted-foreground">not joined</span>}
+                      </div>
+                    </div>
+                    {net !== 0 && (
+                      <p className={cn('text-xs font-semibold tabular-nums', net > 0 ? 'text-green-700' : 'text-amber-700')}>
+                        {net > 0 ? '+' : ''}{formatCurrency(net)}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        {noHouse.map(m => {
+          const balance = balancesData?.memberBalances.find(b => b.memberId === m.id);
+          const net = balance?.netBalance ?? 0;
+          return (
+            <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">{m.name[0].toUpperCase()}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{m.name}</p>
+                {m.isHost && <p className="text-xs text-muted-foreground">host</p>}
+              </div>
+              {net !== 0 && <p className={cn('text-xs font-semibold tabular-nums', net > 0 ? 'text-green-700' : 'text-amber-700')}>{net > 0 ? '+' : ''}{formatCurrency(net)}</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Settlement summary */}
+      {(settlements as any[]).length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Settlements</h3>
+          <div className="space-y-2">
+            {(settlements as any[]).slice(0, 5).map((s: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                <span className="text-sm font-medium text-foreground flex-1 truncate">{s.fromMemberName}</span>
+                <ArrowRight size={14} className="text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium text-foreground flex-1 truncate">{s.toMemberName}</span>
+                <span className="text-sm font-semibold tabular-nums text-amber-700">{formatCurrency(s.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Expense breakdown */}
+      {summary && summary.categoryBreakdown.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">By Category</h3>
+          <div className="space-y-1.5">
+            {summary.categoryBreakdown.sort((a, b) => b.total - a.total).map(cat => (
+              <div key={cat.category} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-2">
+                <span className="text-sm text-foreground capitalize">{cat.category} <span className="text-xs text-muted-foreground">×{cat.count}</span></span>
+                <span className="text-sm font-semibold tabular-nums">{formatCurrency(cat.total)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Event Details Editor ──────────────────────────────────────────────────────
+function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: string; hostToken: string; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    description: '', venue: '', address: '', mapsLink: '',
+    startDate: '', endDate: '', itinerary: '', settlementMode: 'individual' as 'individual' | 'house',
+  });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!eventToken || loaded) return;
+    fetch(`/api/events/${eventToken}`)
+      .then(r => r.json())
+      .then(data => {
+        setForm({
+          description: data.description ?? '',
+          venue: data.venue ?? '',
+          address: data.address ?? '',
+          mapsLink: data.mapsLink ?? '',
+          startDate: data.startDate ? new Date(data.startDate).toISOString().slice(0, 16) : '',
+          endDate: data.endDate ? new Date(data.endDate).toISOString().slice(0, 16) : '',
+          itinerary: data.itinerary ?? '',
+          settlementMode: data.settlementMode ?? 'individual',
+        });
+        setLoaded(true);
+      })
+      .catch(() => {});
+  }, [eventToken, loaded]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/events/${eventToken}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
+        body: JSON.stringify({
+          description: form.description || null,
+          venue: form.venue || null,
+          address: form.address || null,
+          mapsLink: form.mapsLink || null,
+          startDate: form.startDate || null,
+          endDate: form.endDate || null,
+          itinerary: form.itinerary || null,
+          settlementMode: form.settlementMode,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast.success('Event details saved.');
+      onClose();
+    } catch {
+      toast.error('Could not save. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSave} className="space-y-4 pt-1 max-h-[65dvh] overflow-y-auto">
+      <div className="space-y-1.5">
+        <Label>Description</Label>
+        <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What's the occasion?" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Venue</Label>
+        <Input value={form.venue} onChange={e => setForm(f => ({ ...f, venue: e.target.value }))} placeholder="Venue name" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Address</Label>
+        <Input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="Full address" />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Google Maps link</Label>
+        <Input value={form.mapsLink} onChange={e => setForm(f => ({ ...f, mapsLink: e.target.value }))} placeholder="https://maps.google.com/…" type="url" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label>Start</Label>
+          <Input type="datetime-local" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>End</Label>
+          <Input type="datetime-local" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label>Itinerary</Label>
+        <textarea
+          value={form.itinerary}
+          onChange={e => setForm(f => ({ ...f, itinerary: e.target.value }))}
+          placeholder="7:00 PM – Arrive&#10;8:00 PM – Dinner&#10;…"
+          rows={4}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label>Settlement mode</Label>
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg w-fit">
+          {(['individual', 'house'] as const).map(m => (
+            <button key={m} type="button" onClick={() => setForm(f => ({ ...f, settlementMode: m }))}
+              className={cn('px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize',
+                form.settlementMode === m ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+              {m === 'house' ? 'By House' : 'Individual'}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {form.settlementMode === 'house' ? 'Settlements are grouped by house.' : 'Each person settles individually.'}
+        </p>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+        <Button type="submit" disabled={saving}>{saving ? 'Saving…' : 'Save Details'}</Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -391,22 +521,17 @@ function EventsTab({ hostToken }: { hostToken: string }) {
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
+  const [showDetailsDialog, setShowDetailsDialog] = useState<string | null>(null);
+  const [showOverviewToken, setShowOverviewToken] = useState<string | null>(null);
   const [createdEvent, setCreatedEvent] = useState<{ token: string; name: string; pin: string } | null>(null);
 
-  const [form, setForm] = useState({
-    name: '',
-    hostPersonId: 0,
-    attendeePersonIds: [] as number[],
-  });
-
+  const [form, setForm] = useState({ name: '', hostPersonId: 0, attendeePersonIds: [] as number[] });
   const activePeople = people.filter(p => p.active);
 
   const toggleAttendee = (id: number) => {
     setForm(f => ({
       ...f,
-      attendeePersonIds: f.attendeePersonIds.includes(id)
-        ? f.attendeePersonIds.filter(x => x !== id)
-        : [...f.attendeePersonIds, id],
+      attendeePersonIds: f.attendeePersonIds.includes(id) ? f.attendeePersonIds.filter(x => x !== id) : [...f.attendeePersonIds, id],
     }));
   };
 
@@ -429,13 +554,8 @@ function EventsTab({ hostToken }: { hostToken: string }) {
     });
   };
 
-  const shareUrl = createdEvent
-    ? `${window.location.origin}${import.meta.env.BASE_URL}e/${createdEvent.token}`
-    : '';
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(shareUrl).then(() => toast.success('Link copied.'));
-  };
+  const shareUrl = createdEvent ? `${window.location.origin}${import.meta.env.BASE_URL}e/${createdEvent.token}` : '';
+  const copyLink = () => navigator.clipboard.writeText(shareUrl).then(() => toast.success('Link copied.'));
 
   if (isLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>;
 
@@ -450,22 +570,35 @@ function EventsTab({ hostToken }: { hostToken: string }) {
 
       {events.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
-          <p className="font-display text-2xl text-foreground">No events yet.</p>
+          <p className="font-display text-2xl">No events yet.</p>
           <p className="text-sm text-muted-foreground">Create your first event when the evening begins.</p>
         </div>
       ) : (
         <div className="space-y-2">
           {events.map(ev => (
-            <div key={ev.id} className="flex items-center gap-4 rounded-lg border border-border bg-card px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-foreground truncate">{ev.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {ev.memberCount} people · {formatCurrency(ev.totalExpenses)} · {ev.frozen ? 'Closed' : 'Open'}
-                </p>
+            <div key={ev.id} className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
+              <div className="flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground truncate">{ev.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ev.memberCount} people · {formatCurrency(ev.totalExpenses)} · {ev.frozen ? 'Closed' : 'Open'}
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button size="sm" variant="ghost" onClick={() => setShowDetailsDialog(showDetailsDialog === ev.token ? null : ev.token)}>
+                    Details
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowOverviewToken(showOverviewToken === ev.token ? null : ev.token)}>
+                    {showOverviewToken === ev.token ? 'Close' : 'Overview'}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setLocation(`/e/${ev.token}/dashboard`)}>Open</Button>
+                </div>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setLocation(`/e/${ev.token}/dashboard`)}>
-                Open
-              </Button>
+              {showOverviewToken === ev.token && (
+                <div className="border-t border-border pt-4 mt-2">
+                  <EventOverview eventToken={ev.token} hostToken={hostToken} />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -481,26 +614,14 @@ function EventsTab({ hostToken }: { hostToken: string }) {
           <form onSubmit={handleCreate} className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label>Event name</Label>
-              <Input
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Movie Night"
-                required
-                autoFocus
-              />
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Movie Night" required autoFocus />
             </div>
             <div className="space-y-1.5">
               <Label>Host (you)</Label>
-              <select
-                value={form.hostPersonId}
-                onChange={e => setForm(f => ({ ...f, hostPersonId: parseInt(e.target.value) }))}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                required
-              >
+              <select value={form.hostPersonId} onChange={e => setForm(f => ({ ...f, hostPersonId: parseInt(e.target.value) }))}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" required>
                 <option value="">Select host…</option>
-                {activePeople.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.houseName})</option>
-                ))}
+                {activePeople.map(p => <option key={p.id} value={p.id}>{p.name} ({p.houseName})</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
@@ -508,14 +629,12 @@ function EventsTab({ hostToken }: { hostToken: string }) {
               <div className="space-y-1 max-h-48 overflow-y-auto rounded-md border border-input p-2">
                 {activePeople.map(p => (
                   <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded cursor-pointer hover:bg-muted/40">
-                    <input
-                      type="checkbox"
+                    <input type="checkbox"
                       checked={form.attendeePersonIds.includes(p.id) || form.hostPersonId === p.id}
                       disabled={form.hostPersonId === p.id}
                       onChange={() => toggleAttendee(p.id)}
-                      className="rounded"
-                    />
-                    <span className="text-sm text-foreground">{p.name}</span>
+                      className="rounded" />
+                    <span className="text-sm">{p.name}</span>
                     <span className="text-xs text-muted-foreground ml-auto">{p.houseName}</span>
                   </label>
                 ))}
@@ -531,16 +650,25 @@ function EventsTab({ hostToken }: { hostToken: string }) {
         </DialogContent>
       </Dialog>
 
+      {/* Event details dialog */}
+      <Dialog open={!!showDetailsDialog} onOpenChange={() => setShowDetailsDialog(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-normal">Event Details</DialogTitle>
+            <DialogDescription>Set venue, dates, itinerary, and settlement mode.</DialogDescription>
+          </DialogHeader>
+          {showDetailsDialog && (
+            <EventDetailsDialog eventToken={showDetailsDialog} hostToken={hostToken} onClose={() => setShowDetailsDialog(null)} />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Share dialog */}
       <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">
-              {createdEvent?.name} is ready.
-            </DialogTitle>
-            <DialogDescription>
-              Share this link on WhatsApp. The PIN confirms the right event.
-            </DialogDescription>
+            <DialogTitle className="font-display text-2xl font-normal">{createdEvent?.name} is ready.</DialogTitle>
+            <DialogDescription>Share this link. The PIN confirms the right event.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -552,9 +680,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground uppercase tracking-wider">PIN</Label>
-              <p className="font-display text-5xl tracking-[0.3em] text-foreground pl-1">
-                {createdEvent?.pin}
-              </p>
+              <p className="font-display text-5xl tracking-[0.3em] pl-1">{createdEvent?.pin}</p>
             </div>
           </div>
           <DialogFooter>
@@ -573,18 +699,14 @@ export default function HostConsolePage() {
   const [, setLocation] = useLocation();
   const { token: hostToken, logout } = useHostSession();
 
-  // Redirect if not authenticated
   useEffect(() => {
-    if (!hostToken) {
-      setLocation('/host');
-    }
+    if (!hostToken) setLocation('/host');
   }, [hostToken, setLocation]);
 
   if (!hostToken) return null;
 
   return (
     <div className="min-h-dvh bg-background transition-page">
-      {/* Top bar */}
       <header className="border-b border-border bg-card px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-3">
           <button onClick={() => setLocation('/')} className="font-display text-xl text-foreground hover:text-accent transition-colors">

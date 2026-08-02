@@ -1,12 +1,13 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useParams, Link } from 'wouter';
 import { toast } from 'sonner';
-import { useGetEvent, useFreezeEvent, useUnfreezeEvent } from '@workspace/api-client-react';
+import { useGetEvent, useFreezeEvent, useUnfreezeEvent, useGetBalances } from '@workspace/api-client-react';
 import { useLocalSession } from '@/hooks/use-local-session';
 import { useHostSession } from '@/hooks/use-host-session';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 export default function SettingsPage() {
   const { token } = useParams<{ token: string }>();
@@ -14,10 +15,12 @@ export default function SettingsPage() {
   const { session, setSession } = useLocalSession(token ?? '');
   const { token: hostToken } = useHostSession();
   const queryClient = useQueryClient();
+  const [leavePending, setLeavePending] = useState(false);
 
   const hostHeaders = (hostToken ? { 'x-host-token': hostToken } : {}) as Record<string, string>;
 
   const { data: event, isLoading } = useGetEvent(token ?? '', { query: { enabled: !!token } as any });
+  const { data: balancesData } = useGetBalances(token ?? '', { query: { enabled: !!token && !!session } as any });
   const freezeMutation = useFreezeEvent({ request: { headers: hostHeaders } });
   const unfreezeMutation = useUnfreezeEvent({ request: { headers: hostHeaders } });
 
@@ -26,6 +29,10 @@ export default function SettingsPage() {
   }, [session, token, setLocation]);
 
   if (!session) return null;
+
+  const myBalance = balancesData?.memberBalances.find(b => b.memberId === session.memberId);
+  const netBalance = myBalance?.netBalance ?? 0;
+  const hasOutstandingBalance = Math.abs(netBalance) > 1;
 
   const handleFreeze = () => {
     if (!confirm('Close this event? No new expenses can be added.')) return;
@@ -48,9 +55,43 @@ export default function SettingsPage() {
     });
   };
 
-  const handleLeave = () => {
-    setSession(null);
-    setLocation('/');
+  const handleLeave = async () => {
+    if (hasOutstandingBalance) {
+      toast.error(
+        netBalance < 0
+          ? `You still owe ${formatCurrency(Math.abs(netBalance))}. Settle up before leaving.`
+          : `You're still owed ${formatCurrency(netBalance)}. Settle up before leaving.`
+      );
+      return;
+    }
+
+    if (!confirm('Leave this event? You can rejoin using your personal PIN.')) return;
+
+    setLeavePending(true);
+    try {
+      const res = await fetch(`/api/events/${token}/members/${session.memberId}`, {
+        method: 'DELETE',
+        headers: { 'x-member-id': String(session.memberId) },
+      });
+
+      if (res.status === 400) {
+        const json = await res.json();
+        toast.error(json.error ?? 'Could not leave — you may have an outstanding balance.');
+        return;
+      }
+
+      if (!res.ok) {
+        toast.error('Could not leave the event. Please try again.');
+        return;
+      }
+
+      setSession(null);
+      setLocation('/');
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setLeavePending(false);
+    }
   };
 
   return (
@@ -88,10 +129,16 @@ export default function SettingsPage() {
               <span className="text-muted-foreground">Members</span>
               <span className="font-medium text-foreground">{event?.memberCount}</span>
             </div>
+            {(event as any)?.venue && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Venue</span>
+                <span className="font-medium text-foreground truncate max-w-[60%] text-right">{(event as any).venue}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Host actions (only shown if user has host token) */}
+        {/* Host controls */}
         {hostToken && (
           <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Host Controls</p>
@@ -117,7 +164,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Current session */}
+        {/* Your info */}
         <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You</p>
           <div className="flex items-center justify-between">
@@ -125,6 +172,11 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">{session.memberName}</p>
               {session.isHost && <p className="text-xs text-muted-foreground">Host</p>}
             </div>
+            {netBalance !== 0 && (
+              <p className={`text-sm font-semibold tabular-nums ${netBalance > 0 ? 'text-green-700' : 'text-amber-700'}`}>
+                {netBalance > 0 ? '+' : ''}{formatCurrency(netBalance)}
+              </p>
+            )}
           </div>
           {session.personalPin && (
             <div className="rounded-lg bg-muted/50 px-3 py-2 space-y-0.5">
@@ -132,8 +184,20 @@ export default function SettingsPage() {
               <p className="font-display text-2xl tracking-widest text-foreground">{session.personalPin}</p>
             </div>
           )}
-          <Button variant="outline" className="w-full" onClick={handleLeave}>
-            Leave Event
+          {hasOutstandingBalance && (
+            <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">
+              {netBalance < 0
+                ? `You owe ${formatCurrency(Math.abs(netBalance))}. Settle up before you can leave.`
+                : `You're owed ${formatCurrency(netBalance)}. Settle up before you can leave.`}
+            </p>
+          )}
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleLeave}
+            disabled={leavePending}
+          >
+            {leavePending ? 'Leaving…' : 'Leave Event'}
           </Button>
         </div>
       </main>

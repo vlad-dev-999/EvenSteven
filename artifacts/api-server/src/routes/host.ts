@@ -1,10 +1,11 @@
 import { Router, type IRouter } from "express";
-import { validateHostPassword, getHostToken } from "../lib/host-auth";
+import { validateHostPassword, getHostToken, validateHostToken } from "../lib/host-auth";
+import { hostAuthLimiter } from "../app";
 
 const router: IRouter = Router();
 
 /** POST /host/auth — exchange password for a host token */
-router.post("/host/auth", (req, res): void => {
+router.post("/host/auth", hostAuthLimiter, (req, res): void => {
   const { password } = req.body ?? {};
 
   if (typeof password !== "string" || !validateHostPassword(password)) {
@@ -18,7 +19,6 @@ router.post("/host/auth", (req, res): void => {
 /** GET /host/auth/check — verify an existing host token */
 router.get("/host/auth/check", (req, res): void => {
   const token = req.headers["x-host-token"];
-  const { validateHostToken } = require("../lib/host-auth");
 
   if (typeof token !== "string" || !validateHostToken(token)) {
     res.status(401).json({ valid: false });

@@ -1,18 +1,19 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+// ── Startup validation — fail fast if required secrets are missing ────────────
+const REQUIRED_ENV = ["PORT", "HOST_PASSWORD", "SESSION_SECRET", "DATABASE_URL"] as const;
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    logger.fatal({ key }, `Required environment variable "${key}" is not set. Refusing to start.`);
+    process.exit(1);
+  }
 }
 
-const port = Number(rawPort);
-
+const port = Number(process.env["PORT"]);
 if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+  logger.fatal({ port: process.env["PORT"] }, "Invalid PORT value. Refusing to start.");
+  process.exit(1);
 }
 
 app.listen(port, (err) => {
@@ -20,6 +21,5 @@ app.listen(port, (err) => {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
   logger.info({ port }, "Server listening");
 });

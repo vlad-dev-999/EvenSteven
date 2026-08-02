@@ -10,17 +10,42 @@ import {
   housesTable,
 } from "@workspace/db";
 import { generateToken, generatePin } from "../lib/token";
+import { hashPin, verifyPin } from "../lib/pin-hash";
 import { logActivity } from "../lib/activity";
 import { requireHost } from "../lib/host-auth";
+import { pinVerifyLimiter } from "../app";
 
 const router: IRouter = Router();
 
+// ── Helper: shape a full event response ──────────────────────────────────────
+
+function formatEvent(event: typeof eventsTable.$inferSelect, memberCount: number, totalExpenses: number) {
+  return {
+    id: event.id,
+    name: event.name,
+    token: event.token,
+    frozen: event.frozen,
+    memberCount,
+    totalExpenses,
+    createdAt: event.createdAt,
+    // Event details
+    coverImage: event.coverImage ?? null,
+    description: event.description ?? null,
+    venue: event.venue ?? null,
+    address: event.address ?? null,
+    mapsLink: event.mapsLink ?? null,
+    startDate: event.startDate ?? null,
+    endDate: event.endDate ?? null,
+    itinerary: event.itinerary ?? null,
+    settlementMode: event.settlementMode,
+  };
+}
+
+// ── Routes ───────────────────────────────────────────────────────────────────
+
 /** GET /events — list all events (host only) */
 router.get("/events", requireHost, async (req, res): Promise<void> => {
-  const events = await db
-    .select()
-    .from(eventsTable)
-    .orderBy(desc(eventsTable.createdAt));
+  const events = await db.select().from(eventsTable).orderBy(desc(eventsTable.createdAt));
 
   const result = await Promise.all(
     events.map(async (event) => {
@@ -34,15 +59,11 @@ router.get("/events", requireHost, async (req, res): Promise<void> => {
         .from(expensesTable)
         .where(eq(expensesTable.eventId, event.id));
 
-      return {
-        id: event.id,
-        name: event.name,
-        token: event.token,
-        frozen: event.frozen,
-        memberCount: Number(memberCountResult?.count ?? 0),
-        totalExpenses: Number(expenseSumResult?.total ?? 0),
-        createdAt: event.createdAt,
-      };
+      return formatEvent(
+        event,
+        Number(memberCountResult?.count ?? 0),
+        Number(expenseSumResult?.total ?? 0),
+      );
     }),
   );
 
@@ -51,7 +72,11 @@ router.get("/events", requireHost, async (req, res): Promise<void> => {
 
 /** POST /events — create a new event (host only) */
 router.post("/events", requireHost, async (req, res): Promise<void> => {
-  const { name, hostPersonId, attendeePersonIds } = req.body ?? {};
+  const {
+    name, hostPersonId, attendeePersonIds,
+    coverImage, description, venue, address, mapsLink,
+    startDate, endDate, itinerary, settlementMode,
+  } = req.body ?? {};
 
   if (!name || typeof name !== "string") {
     res.status(400).json({ error: "name is required" });
@@ -66,10 +91,8 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
     return;
   }
 
-  // Ensure hostPersonId is in attendeePersonIds
   const allPersonIds: number[] = Array.from(new Set([hostPersonId, ...attendeePersonIds]));
 
-  // Fetch all people + their houses
   const people = await db
     .select({
       id: peopleTable.id,
@@ -95,7 +118,20 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
 
   const [event] = await db
     .insert(eventsTable)
-    .values({ name: name.trim(), token, pin })
+    .values({
+      name: name.trim(),
+      token,
+      pin,
+      coverImage: coverImage ?? null,
+      description: description ?? null,
+      venue: venue ?? null,
+      address: address ?? null,
+      mapsLink: mapsLink ?? null,
+      startDate: startDate ? new Date(startDate) : null,
+      endDate: endDate ? new Date(endDate) : null,
+      itinerary: itinerary ?? null,
+      settlementMode: settlementMode === "house" ? "house" : "individual",
+    })
     .returning();
 
   // Auto-create event-level families from unique houses
@@ -111,7 +147,6 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
     houseToFamilyId.set(houseId, family.id);
   }
 
-  // Create members from people
   const memberInserts = people.map((person) => ({
     eventId: event.id,
     name: person.name,
@@ -119,7 +154,7 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
     houseId: person.houseId ?? undefined,
     familyId: person.houseId ? houseToFamilyId.get(person.houseId) ?? null : null,
     isHost: person.id === hostPersonId,
-    approvedAt: new Date(), // pre-approved — host selected them
+    approvedAt: new Date(),
   }));
 
   const members = await db.insert(membersTable).values(memberInserts).returning();
@@ -128,15 +163,7 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
   await logActivity(event.id, "event_created", { eventName: name }, hostMember.id, hostMember.name);
 
   res.status(201).json({
-    event: {
-      id: event.id,
-      name: event.name,
-      token: event.token,
-      frozen: event.frozen,
-      memberCount: members.length,
-      totalExpenses: 0,
-      createdAt: event.createdAt,
-    },
+    event: formatEvent(event, members.length, 0),
     pin: event.pin,
     hostMember: {
       id: hostMember.id,
@@ -155,11 +182,7 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
 router.get("/events/:token", async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
-  const [event] = await db
-    .select()
-    .from(eventsTable)
-    .where(eq(eventsTable.token, token));
-
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
     return;
@@ -175,32 +198,84 @@ router.get("/events/:token", async (req, res): Promise<void> => {
     .from(expensesTable)
     .where(eq(expensesTable.eventId, event.id));
 
-  res.json({
-    id: event.id,
-    name: event.name,
-    token: event.token,
-    frozen: event.frozen,
-    memberCount: Number(memberCountResult?.count ?? 0),
-    totalExpenses: Number(expenseSumResult?.total ?? 0),
-    createdAt: event.createdAt,
-  });
+  res.json(formatEvent(
+    event,
+    Number(memberCountResult?.count ?? 0),
+    Number(expenseSumResult?.total ?? 0),
+  ));
 });
 
-/** GET /events/:token/identity-options — houses with their event members (for identity selection) */
-router.get("/events/:token/identity-options", async (req, res): Promise<void> => {
+/**
+ * PATCH /events/:token — update event details (host only)
+ * Accepts: coverImage, description, venue, address, mapsLink,
+ *          startDate, endDate, itinerary, settlementMode, name
+ */
+router.patch("/events/:token", requireHost, async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
-  const [event] = await db
-    .select()
-    .from(eventsTable)
-    .where(eq(eventsTable.token, token));
-
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
     return;
   }
 
-  // Get all members for the event with house info
+  const {
+    name, coverImage, description, venue, address, mapsLink,
+    startDate, endDate, itinerary, settlementMode,
+  } = req.body ?? {};
+
+  const updates: Partial<typeof eventsTable.$inferInsert> = {};
+  if (name !== undefined) updates.name = String(name).trim();
+  if (coverImage !== undefined) updates.coverImage = coverImage ?? null;
+  if (description !== undefined) updates.description = description ?? null;
+  if (venue !== undefined) updates.venue = venue ?? null;
+  if (address !== undefined) updates.address = address ?? null;
+  if (mapsLink !== undefined) updates.mapsLink = mapsLink ?? null;
+  if (startDate !== undefined) updates.startDate = startDate ? new Date(startDate) : null;
+  if (endDate !== undefined) updates.endDate = endDate ? new Date(endDate) : null;
+  if (itinerary !== undefined) updates.itinerary = itinerary ?? null;
+  if (settlementMode === "house" || settlementMode === "individual") {
+    updates.settlementMode = settlementMode;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No valid fields to update" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(eventsTable)
+    .set(updates)
+    .where(eq(eventsTable.token, token))
+    .returning();
+
+  const [memberCountResult] = await db
+    .select({ count: count() })
+    .from(membersTable)
+    .where(eq(membersTable.eventId, updated.id));
+
+  const [expenseSumResult] = await db
+    .select({ total: sum(expensesTable.amount) })
+    .from(expensesTable)
+    .where(eq(expensesTable.eventId, updated.id));
+
+  res.json(formatEvent(
+    updated,
+    Number(memberCountResult?.count ?? 0),
+    Number(expenseSumResult?.total ?? 0),
+  ));
+});
+
+/** GET /events/:token/identity-options */
+router.get("/events/:token/identity-options", async (req, res): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
+  if (!event) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
   const members = await db
     .select({
       id: membersTable.id,
@@ -218,7 +293,6 @@ router.get("/events/:token/identity-options", async (req, res): Promise<void> =>
     .leftJoin(housesTable, eq(membersTable.houseId, housesTable.id))
     .where(eq(membersTable.eventId, event.id));
 
-  // Group members by house
   const houseMap = new Map<
     number,
     {
@@ -230,21 +304,14 @@ router.get("/events/:token/identity-options", async (req, res): Promise<void> =>
     }
   >();
 
-  // Add a "no house" group for members without a house
   const noHouseMembers: Array<{ id: number; name: string; claimed: boolean; avatar: string | null; isHost: boolean }> = [];
 
   for (const member of members) {
+    const entry = { id: member.id, name: member.name, claimed: !!member.claimed, avatar: member.avatar ?? null, isHost: member.isHost };
     if (!member.houseId) {
-      noHouseMembers.push({
-        id: member.id,
-        name: member.name,
-        claimed: !!member.claimed,
-        avatar: member.avatar ?? null,
-        isHost: member.isHost,
-      });
+      noHouseMembers.push(entry);
       continue;
     }
-
     if (!houseMap.has(member.houseId)) {
       houseMap.set(member.houseId, {
         id: member.houseId,
@@ -254,34 +321,29 @@ router.get("/events/:token/identity-options", async (req, res): Promise<void> =>
         members: [],
       });
     }
-
-    houseMap.get(member.houseId)!.members.push({
-      id: member.id,
-      name: member.name,
-      claimed: !!member.claimed,
-      avatar: member.avatar ?? null,
-      isHost: member.isHost,
-    });
+    houseMap.get(member.houseId)!.members.push(entry);
   }
-
-  const houses = Array.from(houseMap.values());
 
   res.json({
     eventName: event.name,
-    eventPin: event.pin,
-    houses,
+    // eventPin intentionally omitted — never sent to clients
+    houses: Array.from(houseMap.values()),
+    noHouseMembers,
   });
 });
 
-/** POST /events/:token/identify — claim identity or verify personal PIN */
-router.post("/events/:token/identify", async (req, res): Promise<void> => {
+/**
+ * POST /events/:token/identify — claim identity or verify personal PIN
+ *
+ * First claim:   no PIN stored → generate crypto PIN, hash it, return plaintext once
+ * Return visit:  PIN stored → verify provided PIN against hash (constant-time)
+ * Migration:     falls back to plaintext comparison for existing unhashed PINs,
+ *                then upgrades the stored value to a hash on success
+ */
+router.post("/events/:token/identify", pinVerifyLimiter, async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
-  const [event] = await db
-    .select()
-    .from(eventsTable)
-    .where(eq(eventsTable.token, token));
-
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
     return;
@@ -294,11 +356,7 @@ router.post("/events/:token/identify", async (req, res): Promise<void> => {
     return;
   }
 
-  const [member] = await db
-    .select()
-    .from(membersTable)
-    .where(eq(membersTable.id, memberId));
-
+  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, memberId));
   if (!member || member.eventId !== event.id) {
     res.status(404).json({ error: "Member not found in this event" });
     return;
@@ -309,12 +367,18 @@ router.post("/events/:token/identify", async (req, res): Promise<void> => {
     return;
   }
 
-  // First time claiming identity — no PIN yet
-  if (!member.personalPin) {
+  const storedHash = member.personalPinHash;
+  const legacyPin = member.personalPin;
+  const hasClaim = storedHash || legacyPin;
+
+  // ── First-time claim ──────────────────────────────────────────────────────
+  if (!hasClaim) {
     const newPin = generatePin();
+    const newHash = hashPin(newPin);
+
     const [updated] = await db
       .update(membersTable)
-      .set({ personalPin: newPin, claimedAt: new Date() })
+      .set({ personalPinHash: newHash, personalPin: null, claimedAt: new Date() })
       .where(eq(membersTable.id, member.id))
       .returning();
 
@@ -327,40 +391,52 @@ router.post("/events/:token/identify", async (req, res): Promise<void> => {
     return;
   }
 
-  // Returning user — verify PIN
-  if (personalPin !== undefined) {
-    if (String(personalPin) !== member.personalPin) {
-      res.status(401).json({ error: "Incorrect personal PIN" });
-      return;
-    }
-
-    res.json({
+  // ── Already claimed — PIN required ────────────────────────────────────────
+  if (personalPin === undefined || personalPin === null) {
+    res.status(409).json({
+      error: "Identity already claimed",
+      requiresPin: true,
       memberId: member.id,
       memberName: member.name,
-      isHost: member.isHost,
-      // personalPin NOT returned on verification — client already has it
     });
     return;
   }
 
-  // Already claimed but no PIN provided — tell client to ask for PIN
-  res.status(409).json({
-    error: "Identity already claimed",
-    requiresPin: true,
+  const pinStr = String(personalPin);
+
+  // Verify: prefer hash, fall back to legacy plaintext (and upgrade on match)
+  let verified = false;
+  if (storedHash) {
+    verified = verifyPin(pinStr, storedHash);
+  } else if (legacyPin) {
+    verified = verifyPin(pinStr, legacyPin);
+    if (verified) {
+      // Upgrade to hash
+      await db
+        .update(membersTable)
+        .set({ personalPinHash: hashPin(pinStr), personalPin: null })
+        .where(eq(membersTable.id, member.id));
+    }
+  }
+
+  if (!verified) {
+    res.status(401).json({ error: "Incorrect personal PIN" });
+    return;
+  }
+
+  res.json({
     memberId: member.id,
     memberName: member.name,
+    isHost: member.isHost,
+    // personalPin NOT returned on verification — client already has it
   });
 });
 
-/** POST /events/:token/session — legacy: authenticate with event PIN (kept for backwards compat) */
+/** POST /events/:token/session — legacy event-PIN auth (kept for backward compat) */
 router.post("/events/:token/session", async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
-  const [event] = await db
-    .select()
-    .from(eventsTable)
-    .where(eq(eventsTable.token, token));
-
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
     return;
@@ -373,11 +449,7 @@ router.post("/events/:token/session", async (req, res): Promise<void> => {
     return;
   }
 
-  const [member] = await db
-    .select()
-    .from(membersTable)
-    .where(eq(membersTable.id, memberId));
-
+  const [member] = await db.select().from(membersTable).where(eq(membersTable.id, memberId));
   if (!member || member.eventId !== event.id || !member.approvedAt) {
     res.status(400).json({ error: "Member not found or not approved" });
     return;
@@ -426,7 +498,7 @@ router.get("/events/:token/session", async (req, res): Promise<void> => {
   });
 });
 
-/** POST /events/:token/freeze */
+/** POST /events/:token/freeze (host only) */
 router.post("/events/:token/freeze", requireHost, async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
@@ -436,10 +508,12 @@ router.post("/events/:token/freeze", requireHost, async (req, res): Promise<void
     return;
   }
 
-  res.json({ id: event.id, name: event.name, token: event.token, frozen: event.frozen, createdAt: event.createdAt });
+  const [memberCountResult] = await db.select({ count: count() }).from(membersTable).where(eq(membersTable.eventId, event.id));
+  const [expenseSumResult] = await db.select({ total: sum(expensesTable.amount) }).from(expensesTable).where(eq(expensesTable.eventId, event.id));
+  res.json(formatEvent(event, Number(memberCountResult?.count ?? 0), Number(expenseSumResult?.total ?? 0)));
 });
 
-/** POST /events/:token/unfreeze */
+/** POST /events/:token/unfreeze (host only) */
 router.post("/events/:token/unfreeze", requireHost, async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
 
@@ -449,7 +523,9 @@ router.post("/events/:token/unfreeze", requireHost, async (req, res): Promise<vo
     return;
   }
 
-  res.json({ id: event.id, name: event.name, token: event.token, frozen: event.frozen, createdAt: event.createdAt });
+  const [memberCountResult] = await db.select({ count: count() }).from(membersTable).where(eq(membersTable.eventId, event.id));
+  const [expenseSumResult] = await db.select({ total: sum(expensesTable.amount) }).from(expensesTable).where(eq(expensesTable.eventId, event.id));
+  res.json(formatEvent(event, Number(memberCountResult?.count ?? 0), Number(expenseSumResult?.total ?? 0)));
 });
 
 /** GET /events/:token/summary */
@@ -488,6 +564,7 @@ router.get("/events/:token/summary", async (req, res): Promise<void> => {
     familyCount: Number(familyCountResult?.count ?? 0),
     categoryBreakdown: Array.from(categoryMap.entries()).map(([category, data]) => ({ category, ...data })),
     topPayers: Array.from(payerMap.values()).sort((a, b) => b.totalPaid - a.totalPaid).slice(0, 5),
+    settlementMode: event.settlementMode,
   });
 });
 

@@ -17,7 +17,10 @@ export const membersTable = pgTable("members", {
   personId: integer("person_id").references(() => peopleTable.id, { onDelete: "set null" }),
   houseId: integer("house_id").references(() => housesTable.id, { onDelete: "set null" }),
   // personal PIN for cross-device identity restoration
+  // personalPin: legacy plaintext (kept for migration, will be null for new members)
   personalPin: text("personal_pin"),
+  // personalPinHash: scrypt hash format "scrypt:salt_hex:hash_hex"
+  personalPinHash: text("personal_pin_hash"),
   claimedAt: timestamp("claimed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
