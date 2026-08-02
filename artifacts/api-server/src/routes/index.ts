@@ -9,6 +9,7 @@ import familiesRouter from "./families";
 import joinRequestsRouter from "./joinRequests";
 import expensesRouter from "./expenses";
 import settlementsRouter from "./settlements";
+import directoryRouter from "./directory";
 
 const router: IRouter = Router();
 
@@ -16,6 +17,7 @@ router.use(healthRouter);
 router.use(hostRouter);
 router.use(housesRouter);
 router.use(peopleRouter);
+router.use(directoryRouter);
 router.use(eventsRouter);
 router.use(membersRouter);
 router.use(familiesRouter);

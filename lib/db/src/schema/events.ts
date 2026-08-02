@@ -8,6 +8,7 @@ export const eventsTable = pgTable("events", {
   token: text("token").notNull().unique(),
   pin: text("pin").notNull(),
   frozen: boolean("frozen").notNull().default(false),
+  archived: boolean("archived").notNull().default(false),
   // Event details
   coverImage: text("cover_image"),
   description: text("description"),
@@ -19,6 +20,8 @@ export const eventsTable = pgTable("events", {
   itinerary: text("itinerary"),
   // Settlement configuration
   settlementMode: text("settlement_mode").notNull().default("individual"), // "individual" | "house"
+  // Creator — person_id from the permanent directory (null for admin-created)
+  createdByPersonId: integer("created_by_person_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

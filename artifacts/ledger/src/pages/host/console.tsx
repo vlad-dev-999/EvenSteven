@@ -181,7 +181,7 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
     if (editing) {
       updateMutation.mutate({ id: editing.id, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); setShowDialog(false); toast.success(`${form.name} updated.`); } });
     } else {
-      createMutation.mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); setShowDialog(false); toast.success(`${form.name} added.`); } });
+      createMutation.mutate({ data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); setShowDialog(false); toast.success(`${form.name} added to the directory.`); } });
     }
   };
 
@@ -190,15 +190,15 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
     deleteMutation.mutate({ id: p.id }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); toast.success(`${p.name} removed.`); } });
   };
 
-  const handleSetPin = (p: Person) => {
+  const handleResetPin = (p: Person) => {
     const action = (p as any).hasPin ? 'Reset' : 'Set';
-    if (!confirm(`${action} PIN for ${p.name}? ${(p as any).hasPin ? 'Their current PIN will stop working.' : ''}`)) return;
+    if (!confirm(`${action} PIN for ${p.name}?${(p as any).hasPin ? " Their current PIN will stop working and they'll need to re-activate." : ''}`)) return;
     pinMutation.mutate({ id: p.id }, {
       onSuccess: (result) => {
         queryClient.invalidateQueries({ queryKey: ['/api/people'] });
         setShownPin({ name: p.name, pin: result.pin });
       },
-      onError: () => toast.error('Could not set PIN. Please try again.'),
+      onError: () => toast.error('Could not reset PIN. Please try again.'),
     });
   };
 
@@ -228,17 +228,20 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
               </div>
               {hPeople.map(p => (
                 <div key={p.id} className={cn('flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5', !p.active && 'opacity-50')}>
-                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium text-primary-foreground shrink-0"
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium text-white shrink-0"
                     style={{ backgroundColor: house.accentColor ?? 'hsl(var(--primary))' }}>
                     {p.avatar ? p.avatar : p.name[0].toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       {!p.active && <span className="text-xs text-muted-foreground">inactive</span>}
-                      {(p as any).hasPin
-                        ? <span className="text-xs text-green-700 flex items-center gap-0.5"><KeyRound size={10} />PIN set</span>
-                        : <span className="text-xs text-amber-700 flex items-center gap-0.5"><KeyRound size={10} />No PIN</span>}
+                      {(p as any).activated
+                        ? <span className="text-xs text-green-700 flex items-center gap-0.5"><KeyRound size={10} />Activated</span>
+                        : (p as any).hasPin
+                          ? <span className="text-xs text-amber-700 flex items-center gap-0.5"><KeyRound size={10} />Admin PIN (not self-activated)</span>
+                          : <span className="text-xs text-muted-foreground flex items-center gap-0.5"><KeyRound size={10} />Not activated</span>
+                      }
                     </div>
                   </div>
                   <div className="flex gap-1 shrink-0">
@@ -246,10 +249,10 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
                       size="sm"
                       variant="ghost"
                       className="text-xs"
-                      onClick={() => handleSetPin(p)}
+                      onClick={() => handleResetPin(p)}
                       disabled={pinMutation.isPending}
                     >
-                      {(p as any).hasPin ? 'Reset PIN' : 'Set PIN'}
+                      Reset PIN
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(p)}>Remove</Button>
@@ -266,7 +269,7 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl font-normal">{editing ? 'Edit Person' : 'Add Person'}</DialogTitle>
-            <DialogDescription>{editing ? "Update this person's details." : 'Add someone to your permanent directory.'}</DialogDescription>
+            <DialogDescription>{editing ? "Update this person's details." : 'Add someone to the permanent directory.'}</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-1">
             <div className="space-y-1.5">
@@ -289,11 +292,11 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
                 placeholder="e.g. 🦇 or VK"
                 maxLength={4}
               />
-              <p className="text-xs text-muted-foreground">Optional. Shown on the join page and member cards.</p>
+              <p className="text-xs text-muted-foreground">Optional. Shown on member cards.</p>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="active" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} className="rounded" />
-              <Label htmlFor="active" className="cursor-pointer">Active <span className="text-xs text-muted-foreground font-normal">(inactive people are hidden from the join page)</span></Label>
+              <Label htmlFor="active" className="cursor-pointer">Active <span className="text-xs text-muted-foreground font-normal">(inactive people are hidden from the login page)</span></Label>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
@@ -303,15 +306,15 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
         </DialogContent>
       </Dialog>
 
-      {/* PIN reveal dialog — shown once after generation */}
+      {/* PIN reveal dialog — shown once after reset */}
       <Dialog open={!!shownPin} onOpenChange={() => setShownPin(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl font-normal">
-              {shownPin?.name}'s PIN
+              {shownPin?.name}'s new PIN
             </DialogTitle>
             <DialogDescription>
-              Share this with {shownPin?.name}. It won't be shown again — they'll need it every time they join an event.
+              Share this with {shownPin?.name}. It won't be shown again.
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 text-center">
@@ -336,7 +339,6 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
   const approved = members.filter(m => m.approved);
   const claimed = members.filter(m => m.claimed);
 
-  // Group by house for member display
   const houseMap = new Map<string, typeof members>();
   const noHouse: typeof members = [];
   for (const m of approved) {
@@ -348,7 +350,6 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
 
   return (
     <div className="space-y-6">
-      {/* Stats row */}
       <div className="grid grid-cols-3 gap-3">
         {[
           { icon: <Users size={14} />, label: 'Members', value: `${claimed.length}/${approved.length}` },
@@ -362,7 +363,6 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
         ))}
       </div>
 
-      {/* Member roster */}
       <div className="space-y-2">
         <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Members</h3>
         {Array.from(houseMap.entries()).map(([houseName, hMembers]) => {
@@ -415,7 +415,6 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
         })}
       </div>
 
-      {/* Settlement summary */}
       {(settlements as any[]).length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Settlements</h3>
@@ -432,7 +431,6 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
         </div>
       )}
 
-      {/* Expense breakdown */}
       {summary && summary.categoryBreakdown.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">By Category</h3>
@@ -462,7 +460,7 @@ function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: st
 
   useEffect(() => {
     if (!eventToken || loaded) return;
-    fetch(`/api/events/${eventToken}`)
+    fetch(`${import.meta.env.BASE_URL}api/events/${eventToken}`)
       .then(r => r.json())
       .then(data => {
         setForm({
@@ -484,7 +482,7 @@ function EventDetailsDialog({ eventToken, hostToken, onClose }: { eventToken: st
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch(`/api/events/${eventToken}`, {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/events/${eventToken}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'x-host-token': hostToken },
         body: JSON.stringify({
@@ -585,6 +583,8 @@ function EventsTab({ hostToken }: { hostToken: string }) {
   const [showDetailsDialog, setShowDetailsDialog] = useState<string | null>(null);
   const [showOverviewToken, setShowOverviewToken] = useState<string | null>(null);
   const [createdEvent, setCreatedEvent] = useState<{ token: string; name: string; pin: string } | null>(null);
+  const [archiving, setArchiving] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const [form, setForm] = useState({ name: '', hostPersonId: 0, attendeePersonIds: [] as number[] });
   const activePeople = people.filter(p => p.active);
@@ -615,6 +615,42 @@ function EventsTab({ hostToken }: { hostToken: string }) {
     });
   };
 
+  const handleArchive = async (ev: any) => {
+    if (!confirm(`Archive "${ev.name}"? It will be hidden from the events list and closed.`)) return;
+    setArchiving(ev.token);
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/events/${ev.token}`, {
+        method: 'DELETE',
+        headers: { 'x-host-token': hostToken },
+      });
+      if (!res.ok) throw new Error();
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast.success(`"${ev.name}" archived.`);
+    } catch {
+      toast.error('Could not archive. Please try again.');
+    } finally {
+      setArchiving(null);
+    }
+  };
+
+  const handleDelete = async (ev: any) => {
+    if (!confirm(`Permanently delete "${ev.name}" and all its data? This cannot be undone.`)) return;
+    setDeleting(ev.token);
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}api/events/${ev.token}?mode=hard`, {
+        method: 'DELETE',
+        headers: { 'x-host-token': hostToken },
+      });
+      if (!res.ok) throw new Error();
+      queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+      toast.success(`"${ev.name}" deleted.`);
+    } catch {
+      toast.error('Could not delete. Please try again.');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const shareUrl = createdEvent ? `${window.location.origin}${import.meta.env.BASE_URL}e/${createdEvent.token}` : '';
   const copyLink = () => navigator.clipboard.writeText(shareUrl).then(() => toast.success('Link copied.'));
 
@@ -632,32 +668,58 @@ function EventsTab({ hostToken }: { hostToken: string }) {
       {events.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
           <p className="font-display text-2xl">No events yet.</p>
-          <p className="text-sm text-muted-foreground">Create your first event when the evening begins.</p>
+          <p className="text-sm text-muted-foreground">Create the first event when the evening begins.</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {events.map(ev => (
-            <div key={ev.id} className="rounded-lg border border-border bg-card px-4 py-3 space-y-2">
+          {(events as any[]).map(ev => (
+            <div key={ev.id} className={cn('rounded-lg border border-border bg-card px-4 py-3 space-y-2', ev.archived && 'opacity-60')}>
               <div className="flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground truncate">{ev.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {ev.memberCount} people · {formatCurrency(ev.totalExpenses)} · {ev.frozen ? 'Closed' : 'Open'}
+                    {ev.memberCount} people · {formatCurrency(ev.totalExpenses)} ·{' '}
+                    {ev.archived ? 'Archived' : ev.frozen ? 'Closed' : 'Open'}
                   </p>
                 </div>
-                <div className="flex gap-2 shrink-0">
-                  <Button size="sm" variant="ghost" onClick={() => setShowDetailsDialog(showDetailsDialog === ev.token ? null : ev.token)}>
-                    Details
+                <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+                  {!ev.archived && (
+                    <>
+                      <Button size="sm" variant="ghost" onClick={() => setShowDetailsDialog(showDetailsDialog === ev.token ? null : ev.token)}>
+                        Details
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowOverviewToken(showOverviewToken === ev.token ? null : ev.token)}>
+                        {showOverviewToken === ev.token ? 'Close' : 'Overview'}
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setLocation(`/e/${ev.token}/dashboard`)}>Open</Button>
+                      <Button
+                        size="sm" variant="ghost"
+                        className="text-muted-foreground"
+                        onClick={() => handleArchive(ev)}
+                        disabled={archiving === ev.token}
+                      >
+                        Archive
+                      </Button>
+                    </>
+                  )}
+                  <Button
+                    size="sm" variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(ev)}
+                    disabled={deleting === ev.token}
+                  >
+                    Delete
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setShowOverviewToken(showOverviewToken === ev.token ? null : ev.token)}>
-                    {showOverviewToken === ev.token ? 'Close' : 'Overview'}
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => setLocation(`/e/${ev.token}/dashboard`)}>Open</Button>
                 </div>
               </div>
               {showOverviewToken === ev.token && (
                 <div className="border-t border-border pt-4 mt-2">
                   <EventOverview eventToken={ev.token} hostToken={hostToken} />
+                </div>
+              )}
+              {showDetailsDialog === ev.token && (
+                <div className="border-t border-border pt-4 mt-2">
+                  <EventDetailsDialog eventToken={ev.token} hostToken={hostToken} onClose={() => setShowDetailsDialog(null)} />
                 </div>
               )}
             </div>
@@ -686,7 +748,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Seed attendees <span className="text-muted-foreground font-normal text-xs">(optional — others join via the link)</span></Label>
+              <Label>Seed attendees <span className="text-muted-foreground font-normal text-xs">(optional)</span></Label>
               <div className="space-y-1 max-h-48 overflow-y-auto rounded-md border border-input p-2">
                 {activePeople.map(p => (
                   <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded cursor-pointer hover:bg-muted/40">
@@ -711,25 +773,12 @@ function EventsTab({ hostToken }: { hostToken: string }) {
         </DialogContent>
       </Dialog>
 
-      {/* Event details dialog */}
-      <Dialog open={!!showDetailsDialog} onOpenChange={() => setShowDetailsDialog(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">Event Details</DialogTitle>
-            <DialogDescription>Set venue, dates, itinerary, and settlement mode.</DialogDescription>
-          </DialogHeader>
-          {showDetailsDialog && (
-            <EventDetailsDialog eventToken={showDetailsDialog} hostToken={hostToken} onClose={() => setShowDetailsDialog(null)} />
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Share dialog */}
       <Dialog open={showShareDialog} onOpenChange={setShowShareDialog}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl font-normal">{createdEvent?.name} is ready.</DialogTitle>
-            <DialogDescription>Share this link. The PIN confirms the right event.</DialogDescription>
+            <DialogDescription>Share this link via WhatsApp. The PIN confirms the right event.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
@@ -756,7 +805,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
 }
 
 // ─── Main Console ──────────────────────────────────────────────────────────────
-export default function HostConsolePage() {
+export default function StewardsDeskPage() {
   const [, setLocation] = useLocation();
   const { token: hostToken, logout } = useHostSession();
 
@@ -774,7 +823,7 @@ export default function HostConsolePage() {
             EvenSteven
           </button>
           <span className="text-muted-foreground/40 text-sm">·</span>
-          <span className="text-sm text-muted-foreground">Host Console</span>
+          <span className="text-sm text-muted-foreground">Steward's Desk</span>
         </div>
         <Button size="sm" variant="ghost" onClick={() => { logout(); setLocation('/host'); }}>
           Sign out
@@ -785,7 +834,7 @@ export default function HostConsolePage() {
         <Tabs defaultValue="events">
           <TabsList className="mb-6 bg-muted/60">
             <TabsTrigger value="events">Events</TabsTrigger>
-            <TabsTrigger value="people">People</TabsTrigger>
+            <TabsTrigger value="people">Directory</TabsTrigger>
             <TabsTrigger value="houses">Houses</TabsTrigger>
           </TabsList>
           <TabsContent value="events">

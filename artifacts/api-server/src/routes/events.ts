@@ -25,6 +25,7 @@ function formatEvent(event: typeof eventsTable.$inferSelect, memberCount: number
     name: event.name,
     token: event.token,
     frozen: event.frozen,
+    archived: event.archived,
     memberCount,
     totalExpenses,
     createdAt: event.createdAt,
@@ -70,9 +71,31 @@ router.get("/events", requireHost, async (req, res): Promise<void> => {
   res.json(result);
 });
 
-/** POST /events — create a new event (host only) */
-router.post("/events", requireHost, async (req, res): Promise<void> => {
-  const { name, hostPersonId, attendeePersonIds } = req.body ?? {};
+/** POST /events — create a new event (host OR authenticated directory member) */
+router.post("/events", async (req, res): Promise<void> => {
+  // Accept either host token or a valid person id (directory member)
+  const hostTokenHeader = req.headers["x-host-token"];
+  const { validateHostToken } = await import("../lib/host-auth");
+  const callerIsHost =
+    typeof hostTokenHeader === "string" && validateHostToken(hostTokenHeader);
+
+  // Member-auth: x-person-id header
+  const personIdHeader = req.headers["x-person-id"];
+  const callerPersonId = personIdHeader
+    ? parseInt(Array.isArray(personIdHeader) ? personIdHeader[0] : personIdHeader, 10)
+    : null;
+
+  if (!callerIsHost && (!callerPersonId || !Number.isFinite(callerPersonId))) {
+    res.status(401).json({ error: "Authentication required. Provide x-host-token or x-person-id." });
+    return;
+  }
+
+  const { name, hostPersonId: bodyHostPersonId, attendeePersonIds } = req.body ?? {};
+
+  // When a member creates an event, they become the host
+  const hostPersonId: number = callerIsHost
+    ? bodyHostPersonId
+    : (callerPersonId as number);
 
   if (!name || typeof name !== "string") {
     res.status(400).json({ error: "name is required" });
@@ -83,6 +106,7 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
     res.status(400).json({ error: "hostPersonId is required" });
     return;
   }
+
 
   // Validate host person exists and is active
   const [hostPerson] = await db
@@ -146,6 +170,46 @@ router.post("/events", requireHost, async (req, res): Promise<void> => {
     event: formatEvent(event, 1 + additionalIds.length, 0),
     pin,
   });
+});
+
+/** DELETE /events/:token — archive or hard-delete (host only) */
+router.delete("/events/:token", requireHost, async (req, res): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
+  if (!event) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  const mode = req.query.mode; // ?mode=hard for permanent delete
+  if (mode === "hard") {
+    await db.delete(eventsTable).where(eq(eventsTable.token, token));
+    res.sendStatus(204);
+  } else {
+    // Default: soft archive
+    const [updated] = await db
+      .update(eventsTable)
+      .set({ archived: true, frozen: true })
+      .where(eq(eventsTable.token, token))
+      .returning();
+
+    const [memberCountResult] = await db
+      .select({ count: count() })
+      .from(membersTable)
+      .where(eq(membersTable.eventId, updated.id));
+
+    const [expenseSumResult] = await db
+      .select({ total: sum(expensesTable.amount) })
+      .from(expensesTable)
+      .where(eq(expensesTable.eventId, updated.id));
+
+    res.json(formatEvent(
+      updated,
+      Number(memberCountResult?.count ?? 0),
+      Number(expenseSumResult?.total ?? 0),
+    ));
+  }
 });
 
 /** GET /events/:token — get a single event */

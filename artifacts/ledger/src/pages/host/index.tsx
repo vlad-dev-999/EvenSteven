@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export default function HostLoginPage() {
+export default function StewardsLoginPage() {
   const [, setLocation] = useLocation();
   const { token, setToken } = useHostSession();
   const [password, setPassword] = useState('');
 
   const authMutation = useHostAuth();
 
-  // If already authenticated, go to console
+  // If already authenticated, go to the desk
   useEffect(() => {
     if (token) {
       setLocation('/host/console');
@@ -44,10 +44,10 @@ export default function HostLoginPage() {
             EvenSteven
           </p>
           <h1 className="font-display text-4xl text-foreground">
-            The Host Console
+            The Steward's Desk
           </h1>
           <p className="text-sm text-muted-foreground">
-            Manage houses, people, and events.
+            Directory, houses, and events — for the administrator.
           </p>
         </div>
 
@@ -62,7 +62,7 @@ export default function HostLoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter host password"
+              placeholder="Enter administrator password"
               autoFocus
               required
               className="bg-card border-border"
@@ -76,6 +76,10 @@ export default function HostLoginPage() {
             {authMutation.isPending ? 'Verifying…' : 'Enter'}
           </Button>
         </form>
+
+        <p className="text-xs text-muted-foreground/50 text-center">
+          Members log in through the regular flow.
+        </p>
       </div>
     </div>
   );

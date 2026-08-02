@@ -7,6 +7,9 @@ import HomePage from '@/pages/home';
 import NotFound from '@/pages/not-found';
 import HostLoginPage from '@/pages/host/index';
 import HostConsolePage from '@/pages/host/console';
+import LoginPage from '@/pages/login';
+import ActivatePage from '@/pages/activate';
+import MyEventsPage from '@/pages/my-events';
 import JoinPage from '@/pages/join';
 import DashboardPage from '@/pages/dashboard';
 import AddExpensePage from '@/pages/add-expense';
@@ -28,8 +31,15 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomePage} />
+      {/* Authentication */}
+      <Route path="/login" component={LoginPage} />
+      <Route path="/activate" component={ActivatePage} />
+      {/* Member home */}
+      <Route path="/my-events" component={MyEventsPage} />
+      {/* Steward's Desk (hidden) */}
       <Route path="/host" component={HostLoginPage} />
       <Route path="/host/console" component={HostConsolePage} />
+      {/* Event routes */}
       <Route path="/e/:token" component={JoinPage} />
       <Route path="/e/:token/dashboard" component={DashboardPage} />
       <Route path="/e/:token/add-expense" component={AddExpensePage} />
