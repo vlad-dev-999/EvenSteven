@@ -13,7 +13,7 @@ import { generateToken, generatePin } from "../lib/token";
 import { hashPin, verifyPin } from "../lib/pin-hash";
 import { logActivity } from "../lib/activity";
 import { requireHost } from "../lib/host-auth";
-import { pinVerifyLimiter } from "../app";
+import { pinVerifyLimiter } from "../lib/rate-limiters";
 
 const router: IRouter = Router();
 

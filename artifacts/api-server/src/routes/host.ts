@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { validateHostPassword, getHostToken, validateHostToken } from "../lib/host-auth";
-import { hostAuthLimiter } from "../app";
+import { hostAuthLimiter } from "../lib/rate-limiters";
 
 const router: IRouter = Router();
 

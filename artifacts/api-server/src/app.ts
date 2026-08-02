@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import { createRateLimiter } from "./lib/rate-limit";
+import { hostAuthLimiter, pinVerifyLimiter } from "./lib/rate-limiters";
 
 const app: Express = express();
 
@@ -29,21 +30,6 @@ app.use(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// ── Global rate limits ────────────────────────────────────────────────────────
-// Tight limit on auth endpoints — applied per-route in the host router.
-// Exported so individual routers can attach them selectively.
-export const hostAuthLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10,
-  message: "Too many login attempts. Please wait 15 minutes before trying again.",
-});
-
-export const pinVerifyLimiter = createRateLimiter({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 20,
-  message: "Too many PIN attempts. Please wait 10 minutes before trying again.",
-});
 
 // Broad API rate limit — protects all endpoints
 app.use(
