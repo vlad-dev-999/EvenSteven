@@ -981,6 +981,19 @@ components:
         createdAt:
           type: string
           format: date-time
+        bannerImage:
+          type: string
+          nullable: true
+        tonightNoteTitle:
+          type: string
+          nullable: true
+        tonightNoteBody:
+          type: string
+          nullable: true
+          maxLength: 300
+        hostMemberName:
+          type: string
+          nullable: true
 
     EventInput:
       type: object

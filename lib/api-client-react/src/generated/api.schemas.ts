@@ -71,6 +71,10 @@ export interface Event {
   memberCount: number;
   totalExpenses: number;
   createdAt: string;
+  bannerImage?: string | null;
+  tonightNoteTitle?: string | null;
+  tonightNoteBody?: string | null;
+  hostMemberName?: string | null;
 }
 
 export interface EventInput {

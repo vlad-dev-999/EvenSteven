@@ -18,6 +18,10 @@ export const eventsTable = pgTable("events", {
   startDate: timestamp("start_date", { withTimezone: true }),
   endDate: timestamp("end_date", { withTimezone: true }),
   itinerary: text("itinerary"),
+  // Banner and tonight's note
+  bannerImage: text("banner_image"),
+  tonightNoteTitle: text("tonight_note_title"),
+  tonightNoteBody: text("tonight_note_body"),
   // Settlement configuration
   settlementMode: text("settlement_mode").notNull().default("individual"), // "individual" | "house"
   // Creator — person_id from the permanent directory (null for admin-created)

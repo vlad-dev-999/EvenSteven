@@ -237,7 +237,11 @@ export const ListEventsResponseItem = zod.object({
   "frozen": zod.boolean(),
   "memberCount": zod.int(),
   "totalExpenses": zod.int(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "bannerImage": zod.string().nullish(),
+  "tonightNoteTitle": zod.string().nullish(),
+  "tonightNoteBody": zod.string().nullish(),
+  "hostMemberName": zod.string().nullish()
 })
 export const ListEventsResponse = zod.array(ListEventsResponseItem)
 
@@ -303,7 +307,11 @@ export const GetEventResponse = zod.object({
   "frozen": zod.boolean(),
   "memberCount": zod.int(),
   "totalExpenses": zod.int(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "bannerImage": zod.string().nullish(),
+  "tonightNoteTitle": zod.string().nullish(),
+  "tonightNoteBody": zod.string().nullish(),
+  "hostMemberName": zod.string().nullish()
 })
 
 

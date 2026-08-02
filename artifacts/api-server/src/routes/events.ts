@@ -19,7 +19,12 @@ const router: IRouter = Router();
 
 // ── Helper: shape a full event response ──────────────────────────────────────
 
-function formatEvent(event: typeof eventsTable.$inferSelect, memberCount: number, totalExpenses: number) {
+function formatEvent(
+  event: typeof eventsTable.$inferSelect,
+  memberCount: number,
+  totalExpenses: number,
+  hostMemberName: string | null = null,
+) {
   return {
     id: event.id,
     name: event.name,
@@ -39,7 +44,21 @@ function formatEvent(event: typeof eventsTable.$inferSelect, memberCount: number
     endDate: event.endDate ?? null,
     itinerary: event.itinerary ?? null,
     settlementMode: event.settlementMode,
+    // Banner and tonight's note
+    bannerImage: event.bannerImage ?? null,
+    tonightNoteTitle: event.tonightNoteTitle ?? null,
+    tonightNoteBody: event.tonightNoteBody ?? null,
+    hostMemberName,
   };
+}
+
+/** Query the host member name for an event. */
+async function getHostMemberName(eventId: number): Promise<string | null> {
+  const [hostMember] = await db
+    .select({ name: membersTable.name })
+    .from(membersTable)
+    .where(and(eq(membersTable.eventId, eventId), eq(membersTable.isHost, true)));
+  return hostMember?.name ?? null;
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
