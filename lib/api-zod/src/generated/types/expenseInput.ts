@@ -16,6 +16,6 @@ export interface ExpenseInput {
   description?: string | null;
   splitType: ExpenseInputSplitType;
   participantIds?: number[] | null;
-  familyIds?: number[] | null;
+  houseIds?: number[] | null;
   createdByMemberId: number;
 }

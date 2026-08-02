@@ -1290,7 +1290,7 @@ components:
           items:
             type: integer
           nullable: true
-        familyIds:
+        houseIds:
           type: array
           items:
             type: integer

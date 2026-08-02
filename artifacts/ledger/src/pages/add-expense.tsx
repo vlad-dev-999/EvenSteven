@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useParams, Link } from 'wouter';
 import { toast } from 'sonner';
-import { useGetEvent, useListMembers, useListFamilies, useCreateExpense } from '@workspace/api-client-react';
+import { useGetEvent, useListMembers, useCreateExpense } from '@workspace/api-client-react';
 import { useLocalSession } from '@/hooks/use-local-session';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,6 @@ export default function AddExpensePage() {
 
   const { data: event } = useGetEvent(token ?? '', { query: { enabled: !!token } as any });
   const { data: members = [] } = useListMembers(token ?? '', { query: { enabled: !!token } as any });
-  const { data: families = [] } = useListFamilies(token ?? '', { query: { enabled: !!token } as any });
   const createMutation = useCreateExpense();
 
   const [step, setStep] = useState<Step>('category');
@@ -39,9 +38,20 @@ export default function AddExpensePage() {
   const [paidByMemberId, setPaidByMemberId] = useState<number>(0);
   const [splitType, setSplitType] = useState<'everyone' | 'families' | 'members'>('everyone');
   const [selectedMemberIds, setSelectedMemberIds] = useState<number[]>([]);
-  const [selectedFamilyIds, setSelectedFamilyIds] = useState<number[]>([]);
+  const [selectedHouseIds, setSelectedHouseIds] = useState<number[]>([]);
 
   const approvedMembers = members.filter(m => m.approved);
+
+  // Derive distinct houses from directory-level houseId on approved members
+  const houses = Array.from(
+    approvedMembers
+      .filter(m => m.houseId != null && m.houseName != null)
+      .reduce((map, m) => {
+        if (!map.has(m.houseId!)) map.set(m.houseId!, { id: m.houseId!, name: m.houseName! });
+        return map;
+      }, new Map<number, { id: number; name: string }>())
+      .values()
+  );
 
   useEffect(() => {
     if (!session) setLocation(`/e/${token}`);
@@ -67,7 +77,7 @@ export default function AddExpensePage() {
         paidByMemberId,
         splitType,
         participantIds: splitType === 'members' ? selectedMemberIds : undefined,
-        familyIds: splitType === 'families' ? selectedFamilyIds : undefined,
+        houseIds: splitType === 'families' ? selectedHouseIds : undefined,
         createdByMemberId: session.memberId,
       },
     }, {
@@ -210,7 +220,7 @@ export default function AddExpensePage() {
             <div className="space-y-2">
               {[
                 { id: 'everyone', label: 'Everyone', desc: 'Split equally among all attendees' },
-                ...(families.length > 0 ? [{ id: 'families', label: 'By House', desc: 'One share per household' }] : []),
+                ...(houses.length > 0 ? [{ id: 'families', label: 'By House', desc: 'One share per household' }] : []),
                 { id: 'members', label: 'Specific people', desc: 'Choose who shares this expense' },
               ].map(opt => (
                 <button
@@ -253,21 +263,21 @@ export default function AddExpensePage() {
               </div>
             )}
 
-            {/* Family/house selector */}
+            {/* House selector */}
             {splitType === 'families' && (
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Select houses</Label>
-                {families.map(f => (
-                  <label key={f.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 cursor-pointer hover:bg-muted/30">
+                {houses.map(h => (
+                  <label key={h.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 cursor-pointer hover:bg-muted/30">
                     <input
                       type="checkbox"
-                      checked={selectedFamilyIds.includes(f.id)}
-                      onChange={e => setSelectedFamilyIds(prev =>
-                        e.target.checked ? [...prev, f.id] : prev.filter(id => id !== f.id)
+                      checked={selectedHouseIds.includes(h.id)}
+                      onChange={e => setSelectedHouseIds(prev =>
+                        e.target.checked ? [...prev, h.id] : prev.filter(id => id !== h.id)
                       )}
                       className="rounded"
                     />
-                    <span className="text-sm font-medium text-foreground">{f.name}</span>
+                    <span className="text-sm font-medium text-foreground">{h.name}</span>
                   </label>
                 ))}
               </div>
@@ -294,7 +304,7 @@ export default function AddExpensePage() {
               disabled={
                 createMutation.isPending ||
                 (splitType === 'members' && selectedMemberIds.length === 0) ||
-                (splitType === 'families' && selectedFamilyIds.length === 0)
+                (splitType === 'families' && selectedHouseIds.length === 0)
               }
               onClick={handleSubmit}
             >

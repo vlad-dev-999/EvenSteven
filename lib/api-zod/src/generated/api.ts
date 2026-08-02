@@ -677,7 +677,7 @@ export const CreateExpenseBody = zod.object({
   "description": zod.string().nullish(),
   "splitType": zod.enum(['everyone', 'families', 'members']),
   "participantIds": zod.array(zod.int()).nullish(),
-  "familyIds": zod.array(zod.int()).nullish(),
+  "houseIds": zod.array(zod.int()).nullish(),
   "createdByMemberId": zod.int()
 })
 
@@ -719,7 +719,7 @@ export const UpdateExpenseBody = zod.object({
   "description": zod.string().nullish(),
   "splitType": zod.enum(['everyone', 'families', 'members']),
   "participantIds": zod.array(zod.int()).nullish(),
-  "familyIds": zod.array(zod.int()).nullish(),
+  "houseIds": zod.array(zod.int()).nullish(),
   "createdByMemberId": zod.int()
 })
 

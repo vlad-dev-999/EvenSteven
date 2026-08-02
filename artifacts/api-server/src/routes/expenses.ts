@@ -6,7 +6,6 @@ import {
   expensesTable,
   expenseParticipantsTable,
   membersTable,
-  familiesTable,
 } from "@workspace/db";
 
 /** Upgrade the event's settlementMode to 'house' when a families-split expense exists. */
@@ -37,7 +36,7 @@ async function computeParticipants(
   amount: number,
   splitType: "everyone" | "families" | "members",
   participantIds: number[] | undefined,
-  familyIds: number[] | undefined,
+  houseIds: number[] | undefined,
 ): Promise<{ memberId: number; shareAmount: number }[]> {
   const approvedMembers = await db
     .select()
@@ -50,11 +49,12 @@ async function computeParticipants(
 
   if (splitType === "everyone") {
     targetMemberIds = approved.map((m) => m.id);
-  } else if (splitType === "families" && familyIds && familyIds.length > 0) {
-    const familyMembers = approved.filter(
-      (m) => m.familyId !== null && familyIds.includes(m.familyId),
+  } else if (splitType === "families" && houseIds && houseIds.length > 0) {
+    // Group by directory-level houseId (same mechanism used by house settlement)
+    const houseMembers = approved.filter(
+      (m) => m.houseId !== null && houseIds.includes(m.houseId),
     );
-    targetMemberIds = familyMembers.map((m) => m.id);
+    targetMemberIds = houseMembers.map((m) => m.id);
   } else if (splitType === "members" && participantIds && participantIds.length > 0) {
     targetMemberIds = participantIds.filter((id) => approved.some((m) => m.id === id));
   }
@@ -165,7 +165,7 @@ router.post("/events/:token/expenses", async (req, res): Promise<void> => {
     return;
   }
 
-  const { paidByMemberId, category, amount, description, splitType, participantIds, familyIds } = parsed.data;
+  const { paidByMemberId, category, amount, description, splitType, participantIds, houseIds } = parsed.data;
 
   const createdByHeader = req.headers["x-member-id"];
   const createdByMemberId = createdByHeader
@@ -190,7 +190,7 @@ router.post("/events/:token/expenses", async (req, res): Promise<void> => {
     amount,
     splitType as "everyone" | "families" | "members",
     participantIds ?? undefined,
-    familyIds ?? undefined,
+    houseIds ?? undefined,
   );
 
   if (participants.length > 0) {
@@ -271,7 +271,7 @@ router.patch("/events/:token/expenses/:expenseId", async (req, res): Promise<voi
       newAmount,
       newSplitType,
       parsed.data.participantIds ?? undefined,
-      parsed.data.familyIds ?? undefined,
+      parsed.data.houseIds ?? undefined,
     );
     if (participants.length > 0) {
       await db.insert(expenseParticipantsTable).values(
