@@ -9,6 +9,9 @@ export const peopleTable = pgTable("people", {
   houseId: integer("house_id").notNull().references(() => housesTable.id, { onDelete: "restrict" }),
   avatar: text("avatar"), // optional emoji or initials override
   active: boolean("active").notNull().default(true),
+  // Personal 4-digit PIN for directory-based identity verification.
+  // Hash format: "scrypt:salt_hex:hash_hex" — plaintext never stored after hashing.
+  personalPinHash: text("personal_pin_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

@@ -7,6 +7,8 @@
  */
 
 export interface IdentifyInput {
-  memberId: number;
-  personalPin?: string | null;
+  /** Directory person ID */
+  personId: number;
+  /** Personal 4-digit PIN set by host in the directory */
+  pin: string;
 }

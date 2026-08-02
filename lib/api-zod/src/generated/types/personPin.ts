@@ -6,8 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface IdentifyResult {
-  memberId: number;
-  memberName: string;
-  isHost: boolean;
+export interface PersonPin {
+  /** Plaintext 4-digit PIN, returned once. Store securely — never returned again. */
+  pin: string;
 }

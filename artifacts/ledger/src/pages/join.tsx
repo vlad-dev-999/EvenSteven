@@ -23,19 +23,12 @@ export default function JoinPage() {
   const [selectedHouseName, setSelectedHouseName] = useState('');
   const [pinInput, setPinInput] = useState('');
   const [showPinDialog, setShowPinDialog] = useState(false);
-  const [showNewPinDialog, setShowNewPinDialog] = useState(false);
-  const [newPersonalPin, setNewPersonalPin] = useState('');
-
-  // New-join state
-  const [showNewJoin, setShowNewJoin] = useState(false);
-  const [newJoinName, setNewJoinName] = useState('');
-  const [newJoinPending, setNewJoinPending] = useState(false);
 
   const { data: event, isLoading: eventLoading, error: eventError } = useGetEvent(token ?? '', {
     query: { enabled: !!token, retry: false } as any,
   });
 
-  const { data: options, isLoading: optionsLoading, refetch: refetchOptions } = useGetIdentityOptions(token ?? '', {
+  const { data: options, isLoading: optionsLoading } = useGetIdentityOptions(token ?? '', {
     query: { enabled: !!token && !!event } as any,
   });
 
@@ -67,47 +60,42 @@ export default function JoinPage() {
     );
   }
 
-  // ── Claim an existing member slot ──────────────────────────────────────────
-  const handleMemberTap = (member: IdentityMember, houseName: string) => {
+  // ── Tap a person from the directory ──────────────────────────────────────────
+  const handlePersonTap = (member: IdentityMember, houseName: string) => {
+    if (!member.hasPin) {
+      toast.error(`${member.name} doesn't have a PIN yet. Ask the host to set one.`);
+      return;
+    }
     setSelectedMember(member);
     setSelectedHouseName(houseName);
-
-    if (member.claimed) {
-      setPinInput('');
-      setShowPinDialog(true);
-    } else {
-      claimMember(member.id);
-    }
+    setPinInput('');
+    setShowPinDialog(true);
   };
 
-  const claimMember = (memberId: number) => {
+  // ── Submit PIN ────────────────────────────────────────────────────────────────
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMember || pinInput.length !== 4) return;
+
     identifyMutation.mutate(
-      { token: token!, data: { memberId } },
+      { token: token!, data: { personId: selectedMember.id, pin: pinInput } },
       {
         onSuccess: (result) => {
-          if ((result as any).personalPin) {
-            setNewPersonalPin((result as any).personalPin);
-            setShowNewPinDialog(true);
-            setSession({
-              memberId: result.memberId,
-              memberName: result.memberName,
-              isHost: result.isHost,
-              personalPin: (result as any).personalPin,
-            });
-          } else {
-            setSession({
-              memberId: result.memberId,
-              memberName: result.memberName,
-              isHost: result.isHost,
-            });
-            setLocation(`/e/${token}/dashboard`);
-          }
+          setSession({
+            memberId: result.memberId,
+            memberName: result.memberName,
+            isHost: result.isHost,
+          });
+          setShowPinDialog(false);
+          setLocation(`/e/${token}/dashboard`);
         },
         onError: (err: any) => {
-          if (err?.status === 409) {
+          if (err?.status === 401 || err?.response?.status === 401) {
+            toast.error('Incorrect PIN. Try again.');
             setPinInput('');
-            setShowPinDialog(true);
-            refetchOptions();
+          } else if (err?.status === 403 || err?.response?.status === 403) {
+            toast.error('No PIN set for this person. Ask the host.');
+            setShowPinDialog(false);
           } else {
             toast.error('Something went wrong. Please try again.');
           }
@@ -116,86 +104,7 @@ export default function JoinPage() {
     );
   };
 
-  // ── Verify PIN for returning member ───────────────────────────────────────
-  const handlePinVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedMember) return;
-
-    identifyMutation.mutate(
-      { token: token!, data: { memberId: selectedMember.id, personalPin: pinInput } },
-      {
-        onSuccess: (result) => {
-          setSession({
-            memberId: result.memberId,
-            memberName: result.memberName,
-            isHost: result.isHost,
-            personalPin: pinInput,
-          });
-          setShowPinDialog(false);
-          setLocation(`/e/${token}/dashboard`);
-        },
-        onError: () => {
-          toast.error('Incorrect PIN. Try again.');
-          setPinInput('');
-        },
-      },
-    );
-  };
-
-  const handleNewPinDismiss = () => {
-    setShowNewPinDialog(false);
-    setLocation(`/e/${token}/dashboard`);
-  };
-
-  // ── Join as a new member (no approval needed) ─────────────────────────────
-  const handleJoinNew = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmedName = newJoinName.trim();
-    if (!trimmedName || !token) return;
-
-    setNewJoinPending(true);
-    try {
-      const res = await fetch(`/api/events/${token}/join-requests`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: trimmedName }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        toast.error(json.error ?? 'Could not join. Please try again.');
-        return;
-      }
-
-      const member = json.member;
-      if (!member) {
-        toast.error('Unexpected response. Please try again.');
-        return;
-      }
-
-      setNewJoinName('');
-      setShowNewJoin(false);
-      setSelectedMember({ id: member.id, name: member.name, claimed: member.claimed, avatar: null, isHost: false });
-      setSelectedHouseName('');
-
-      if (member.claimed) {
-        // Existing member already claimed on another device
-        setPinInput('');
-        setShowPinDialog(true);
-      } else {
-        // New or unclaimed member — claim their PIN now
-        claimMember(member.id);
-      }
-    } catch {
-      toast.error('Network error. Please try again.');
-    } finally {
-      setNewJoinPending(false);
-    }
-  };
-
   const houses = options?.houses ?? [];
-  const noHouseMembers = (options as any)?.noHouseMembers ?? [];
 
   return (
     <div className="min-h-dvh bg-background px-4 py-10 transition-page">
@@ -206,23 +115,22 @@ export default function JoinPage() {
             {options?.eventName ?? event?.name}
           </p>
           <h1 className="font-display text-4xl text-foreground">
-            Who's joining tonight?
+            Who joins us this evening?
           </h1>
           <p className="text-sm text-muted-foreground">
-            Select your house, then tap your name.
+            Select your house, then tap your name and enter your PIN.
           </p>
         </div>
 
-        {houses.length === 0 && noHouseMembers.length === 0 ? (
+        {houses.length === 0 ? (
           <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
             <p className="font-display text-2xl text-foreground">The evening awaits.</p>
             <p className="text-sm text-muted-foreground">
-              No attendees have been added yet. The host will prepare the event shortly.
+              No directory entries yet. The host will set things up shortly.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {/* House cards */}
             {houses.map((house: any) => {
               const isExpanded = expandedHouseId === house.id;
               const accentStyle = house.accentColor ? { borderLeftColor: house.accentColor } : {};
@@ -238,7 +146,15 @@ export default function JoinPage() {
                     onClick={() => setExpandedHouseId(isExpanded ? null : house.id)}
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-lg" aria-hidden>🏠</span>
+                      <span className="text-lg" aria-hidden>
+                        {house.crest === 'star' ? '⭐' :
+                         house.crest === 'leaf' ? '🍃' :
+                         house.crest === 'sun' ? '☀️' :
+                         house.crest === 'moon' ? '🌙' :
+                         house.crest === 'mountain' ? '⛰️' :
+                         house.crest === 'wave' ? '🌊' :
+                         house.crest === 'flame' ? '🔥' : '🏠'}
+                      </span>
                       <span className="font-medium text-foreground">{house.name}</span>
                       <span className="text-xs text-muted-foreground">
                         {house.members.length} {house.members.length === 1 ? 'person' : 'people'}
@@ -261,14 +177,16 @@ export default function JoinPage() {
                         <button
                           key={member.id}
                           className={cn(
-                            'w-full flex items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-muted/40',
-                            member.claimed && 'opacity-60'
+                            'w-full flex items-center gap-4 px-5 py-3 text-left transition-colors',
+                            member.hasPin
+                              ? 'hover:bg-muted/40'
+                              : 'opacity-50 cursor-not-allowed',
                           )}
-                          onClick={() => handleMemberTap(member, house.name)}
+                          onClick={() => handlePersonTap(member, house.name)}
                           disabled={identifyMutation.isPending && selectedMember?.id === member.id}
                         >
                           <div
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold text-primary-foreground shrink-0"
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-sm shrink-0"
                             style={{ backgroundColor: house.accentColor ?? 'hsl(var(--primary))' }}
                           >
                             {member.avatar ?? getInitials(member.name)}
@@ -280,9 +198,13 @@ export default function JoinPage() {
                                 <span className="ml-2 text-xs text-muted-foreground font-normal">host</span>
                               )}
                             </p>
-                            {member.claimed && (
-                              <p className="text-xs text-muted-foreground">Joining from another device?</p>
-                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {member.inEvent
+                                ? 'Already joined'
+                                : member.hasPin
+                                  ? 'Tap to join'
+                                  : 'No PIN — ask host'}
+                            </p>
                           </div>
                           {identifyMutation.isPending && selectedMember?.id === member.id && (
                             <span className="text-xs text-muted-foreground animate-pulse">…</span>
@@ -294,136 +216,56 @@ export default function JoinPage() {
                 </div>
               );
             })}
-
-            {/* Members without a house */}
-            {noHouseMembers.length > 0 && (
-              <div className="rounded-xl border border-border bg-card overflow-hidden">
-                <p className="px-5 py-3 text-xs font-semibold uppercase tracking-widest text-muted-foreground border-b border-border">
-                  Others
-                </p>
-                <div className="divide-y divide-border">
-                  {noHouseMembers.map((member: any) => (
-                    <button
-                      key={member.id}
-                      className={cn(
-                        'w-full flex items-center gap-4 px-5 py-3 text-left transition-colors hover:bg-muted/40',
-                        member.claimed && 'opacity-60'
-                      )}
-                      onClick={() => handleMemberTap(member, '')}
-                    >
-                      <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-                        {member.avatar ?? getInitials(member.name)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground">
-                          {member.name}
-                          {member.isHost && <span className="ml-2 text-xs text-muted-foreground font-normal">host</span>}
-                        </p>
-                        {member.claimed && <p className="text-xs text-muted-foreground">Joining from another device?</p>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Not on the list? Join directly ── */}
-        {!event?.frozen && (
-          <div className="rounded-xl border border-border bg-card overflow-hidden">
-            <button
-              className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
-              onClick={() => setShowNewJoin(!showNewJoin)}
-            >
-              <div>
-                <p className="font-medium text-foreground">Not on the list?</p>
-                <p className="text-xs text-muted-foreground">Join directly — no approval needed.</p>
-              </div>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2"
-                strokeLinecap="round" strokeLinejoin="round"
-                className={cn('text-muted-foreground transition-transform duration-200 shrink-0', showNewJoin && 'rotate-180')}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            {showNewJoin && (
-              <div className="border-t border-border px-5 py-4">
-                <form onSubmit={handleJoinNew} className="space-y-3">
-                  <Input
-                    value={newJoinName}
-                    onChange={e => setNewJoinName(e.target.value)}
-                    placeholder="Your name"
-                    maxLength={100}
-                    autoFocus
-                    required
-                  />
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={!newJoinName.trim() || newJoinPending || identifyMutation.isPending}
-                  >
-                    {newJoinPending || identifyMutation.isPending ? 'Joining…' : 'Join Event'}
-                  </Button>
-                </form>
-              </div>
-            )}
           </div>
         )}
       </div>
 
-      {/* ── PIN verification dialog ── */}
-      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+      {/* ── PIN entry dialog ── */}
+      <Dialog open={showPinDialog} onOpenChange={open => { if (!identifyMutation.isPending) setShowPinDialog(open); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl font-normal">
-              Welcome back, {selectedMember?.name}.
+              {selectedMember?.inEvent
+                ? `Welcome back, ${selectedMember?.name}.`
+                : `Hello, ${selectedMember?.name}.`}
             </DialogTitle>
             <DialogDescription>
-              This identity was claimed on another device. Enter your personal PIN to continue.
+              {selectedHouseName && (
+                <span className="text-muted-foreground">{selectedHouseName} · </span>
+              )}
+              Enter your 4-digit PIN to join the event.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handlePinVerify} className="space-y-4 pt-2">
+          <form onSubmit={handlePinSubmit} className="space-y-4 pt-2">
             <Input
               type="tel"
               inputMode="numeric"
               pattern="[0-9]{4}"
               maxLength={4}
-              placeholder="4-digit PIN"
+              placeholder="· · · ·"
               value={pinInput}
               onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
               autoFocus
               required
-              className="text-center text-lg tracking-widest"
+              className="text-center text-2xl tracking-[0.5em] font-mono"
             />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowPinDialog(false)}>Cancel</Button>
-              <Button type="submit" disabled={pinInput.length !== 4 || identifyMutation.isPending}>
-                {identifyMutation.isPending ? 'Verifying…' : 'Continue'}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPinDialog(false)}
+                disabled={identifyMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={pinInput.length !== 4 || identifyMutation.isPending}
+              >
+                {identifyMutation.isPending ? 'Verifying…' : 'Enter'}
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── New PIN reveal dialog ── */}
-      <Dialog open={showNewPinDialog} onOpenChange={setShowNewPinDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">Your personal PIN</DialogTitle>
-            <DialogDescription>
-              Save this four-digit PIN. You'll need it to join from another device.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 text-center">
-            <p className="font-display text-6xl text-foreground tracking-[0.3em]">{newPersonalPin}</p>
-          </div>
-          <DialogFooter>
-            <Button className="w-full" onClick={handleNewPinDismiss}>I've noted it — continue</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

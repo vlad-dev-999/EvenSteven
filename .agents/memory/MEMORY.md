@@ -1,0 +1,1 @@
+- [Directory-based identity model](directory-identity.md) — PIN and identity moved from event-scope (members) to directory-scope (people); no self-registration.

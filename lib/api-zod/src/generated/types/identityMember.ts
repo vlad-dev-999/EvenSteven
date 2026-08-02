@@ -7,9 +7,13 @@
  */
 
 export interface IdentityMember {
+  /** Directory person ID (people.id) */
   id: number;
   name: string;
-  claimed: boolean;
+  /** Whether this person already has a PIN set in the directory */
+  hasPin: boolean;
+  /** Whether this person is already a participating member of this event */
+  inEvent: boolean;
   avatar?: string | null;
   isHost: boolean;
 }

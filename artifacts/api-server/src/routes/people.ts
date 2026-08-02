@@ -3,6 +3,8 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { peopleTable, housesTable } from "@workspace/db";
 import { requireHost } from "../lib/host-auth";
+import { generatePin } from "../lib/token";
+import { hashPin } from "../lib/pin-hash";
 
 const router: IRouter = Router();
 
@@ -18,13 +20,17 @@ router.get("/people", async (req, res): Promise<void> => {
       houseAccentColor: housesTable.accentColor,
       avatar: peopleTable.avatar,
       active: peopleTable.active,
+      hasPin: peopleTable.personalPinHash,
       createdAt: peopleTable.createdAt,
     })
     .from(peopleTable)
     .leftJoin(housesTable, eq(peopleTable.houseId, housesTable.id))
     .orderBy(housesTable.name, peopleTable.name);
 
-  res.json(people);
+  res.json(people.map(p => ({
+    ...p,
+    hasPin: !!p.hasPin, // expose boolean, never expose hash
+  })));
 });
 
 /** POST /people — create a person (host only) */
@@ -53,10 +59,16 @@ router.post("/people", requireHost, async (req, res): Promise<void> => {
   const [house] = await db.select().from(housesTable).where(eq(housesTable.id, person.houseId));
 
   res.status(201).json({
-    ...person,
+    id: person.id,
+    name: person.name,
+    houseId: person.houseId,
     houseName: house?.name ?? null,
     houseCrest: house?.crest ?? null,
     houseAccentColor: house?.accentColor ?? null,
+    avatar: person.avatar,
+    active: person.active,
+    hasPin: false,
+    createdAt: person.createdAt,
   });
 });
 
@@ -91,11 +103,46 @@ router.patch("/people/:id", requireHost, async (req, res): Promise<void> => {
   const [house] = await db.select().from(housesTable).where(eq(housesTable.id, updated.houseId));
 
   res.json({
-    ...updated,
+    id: updated.id,
+    name: updated.name,
+    houseId: updated.houseId,
     houseName: house?.name ?? null,
     houseCrest: house?.crest ?? null,
     houseAccentColor: house?.accentColor ?? null,
+    avatar: updated.avatar,
+    active: updated.active,
+    hasPin: !!updated.personalPinHash,
+    createdAt: updated.createdAt,
   });
+});
+
+/**
+ * POST /people/:id/pin — generate (or reset) a person's personal PIN (host only).
+ *
+ * Generates a new cryptographically secure 4-digit PIN, hashes it with scrypt,
+ * and stores the hash on the person record. Returns the plaintext PIN **once** —
+ * it is never stored or returned again.
+ */
+router.post("/people/:id/pin", requireHost, async (req, res): Promise<void> => {
+  const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(rawId, 10);
+
+  const [person] = await db.select().from(peopleTable).where(eq(peopleTable.id, id));
+  if (!person) {
+    res.status(404).json({ error: "Person not found" });
+    return;
+  }
+
+  const pin = generatePin();
+  const pinHash = hashPin(pin);
+
+  await db
+    .update(peopleTable)
+    .set({ personalPinHash: pinHash })
+    .where(eq(peopleTable.id, id));
+
+  // Return plaintext once — host must share it with the person
+  res.json({ pin });
 });
 
 /** DELETE /people/:id — delete a person (host only) */

@@ -10,6 +10,7 @@ import {
   useCreatePerson,
   useUpdatePerson,
   useDeletePerson,
+  useResetPersonPin,
   useListEvents,
   useCreateEvent,
   useListMembers,
@@ -26,7 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn, formatCurrency } from '@/lib/utils';
-import { ArrowRight, Users, TrendingUp, CheckCircle } from 'lucide-react';
+import { ArrowRight, Users, TrendingUp, CheckCircle, KeyRound } from 'lucide-react';
 
 const CREST_OPTIONS = [
   { value: 'home', label: '🏠' },
@@ -162,17 +163,21 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
   const createMutation = useCreatePerson({ request: { headers: hostHeaders } });
   const updateMutation = useUpdatePerson({ request: { headers: hostHeaders } });
   const deleteMutation = useDeletePerson({ request: { headers: hostHeaders } });
+  const pinMutation = useResetPersonPin({ request: { headers: hostHeaders } });
 
   const [showDialog, setShowDialog] = useState(false);
   const [editing, setEditing] = useState<Person | null>(null);
-  const [form, setForm] = useState({ name: '', houseId: 0, active: true });
+  const [form, setForm] = useState({ name: '', houseId: 0, avatar: '', active: true });
 
-  const openAdd = () => { setEditing(null); setForm({ name: '', houseId: houses[0]?.id ?? 0, active: true }); setShowDialog(true); };
-  const openEdit = (p: Person) => { setEditing(p); setForm({ name: p.name, houseId: p.houseId, active: p.active }); setShowDialog(true); };
+  // PIN reveal dialog
+  const [shownPin, setShownPin] = useState<{ name: string; pin: string } | null>(null);
+
+  const openAdd = () => { setEditing(null); setForm({ name: '', houseId: houses[0]?.id ?? 0, avatar: '', active: true }); setShowDialog(true); };
+  const openEdit = (p: Person) => { setEditing(p); setForm({ name: p.name, houseId: p.houseId, avatar: p.avatar ?? '', active: p.active }); setShowDialog(true); };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { name: form.name.trim(), houseId: form.houseId, active: form.active };
+    const data = { name: form.name.trim(), houseId: form.houseId, avatar: form.avatar.trim() || undefined, active: form.active };
     if (editing) {
       updateMutation.mutate({ id: editing.id, data }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); setShowDialog(false); toast.success(`${form.name} updated.`); } });
     } else {
@@ -181,12 +186,23 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
   };
 
   const handleDelete = (p: Person) => {
-    if (!confirm(`Remove ${p.name}?`)) return;
+    if (!confirm(`Remove ${p.name} from the directory?`)) return;
     deleteMutation.mutate({ id: p.id }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); toast.success(`${p.name} removed.`); } });
   };
 
+  const handleSetPin = (p: Person) => {
+    const action = (p as any).hasPin ? 'Reset' : 'Set';
+    if (!confirm(`${action} PIN for ${p.name}? ${(p as any).hasPin ? 'Their current PIN will stop working.' : ''}`)) return;
+    pinMutation.mutate({ id: p.id }, {
+      onSuccess: (result) => {
+        queryClient.invalidateQueries({ queryKey: ['/api/people'] });
+        setShownPin({ name: p.name, pin: result.pin });
+      },
+      onError: () => toast.error('Could not set PIN. Please try again.'),
+    });
+  };
+
   const grouped = houses.map(h => ({ house: h, people: people.filter(p => p.houseId === h.id) })).filter(g => g.people.length > 0);
-  const ungrouped = people.filter(p => !houses.some(h => h.id === p.houseId));
 
   if (peopleLoading) return <p className="text-sm text-muted-foreground py-8 text-center">Loading…</p>;
 
@@ -212,13 +228,29 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
               </div>
               {hPeople.map(p => (
                 <div key={p.id} className={cn('flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5', !p.active && 'opacity-50')}>
-                  <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold text-primary-foreground"
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium text-primary-foreground shrink-0"
                     style={{ backgroundColor: house.accentColor ?? 'hsl(var(--primary))' }}>
-                    {p.name[0].toUpperCase()}
+                    {p.avatar ? p.avatar : p.name[0].toUpperCase()}
                   </div>
-                  <span className="flex-1 text-sm font-medium">{p.name}</span>
-                  {!p.active && <span className="text-xs text-muted-foreground">inactive</span>}
-                  <div className="flex gap-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      {!p.active && <span className="text-xs text-muted-foreground">inactive</span>}
+                      {(p as any).hasPin
+                        ? <span className="text-xs text-green-700 flex items-center gap-0.5"><KeyRound size={10} />PIN set</span>
+                        : <span className="text-xs text-amber-700 flex items-center gap-0.5"><KeyRound size={10} />No PIN</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs"
+                      onClick={() => handleSetPin(p)}
+                      disabled={pinMutation.isPending}
+                    >
+                      {(p as any).hasPin ? 'Reset PIN' : 'Set PIN'}
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(p)}>Remove</Button>
                   </div>
@@ -226,21 +258,20 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
               ))}
             </div>
           ))}
-          {ungrouped.map(p => (
-            <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
-              <span className="flex-1 text-sm font-medium">{p.name}</span>
-              <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Edit</Button>
-            </div>
-          ))}
         </div>
       )}
+
+      {/* Add / Edit person dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle className="font-display text-2xl font-normal">{editing ? 'Edit Person' : 'Add Person'}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-normal">{editing ? 'Edit Person' : 'Add Person'}</DialogTitle>
+            <DialogDescription>{editing ? "Update this person's details." : 'Add someone to your permanent directory.'}</DialogDescription>
+          </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4 pt-1">
             <div className="space-y-1.5">
               <Label>Name</Label>
-              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Mithun" required autoFocus />
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Count Vlad" required autoFocus />
             </div>
             <div className="space-y-1.5">
               <Label>House</Label>
@@ -250,15 +281,45 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
                 {houses.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
               </select>
             </div>
+            <div className="space-y-1.5">
+              <Label>Avatar <span className="text-muted-foreground font-normal">(emoji or initials)</span></Label>
+              <Input
+                value={form.avatar}
+                onChange={e => setForm(f => ({ ...f, avatar: e.target.value }))}
+                placeholder="e.g. 🦇 or VK"
+                maxLength={4}
+              />
+              <p className="text-xs text-muted-foreground">Optional. Shown on the join page and member cards.</p>
+            </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="active" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} className="rounded" />
-              <Label htmlFor="active" className="cursor-pointer">Active</Label>
+              <Label htmlFor="active" className="cursor-pointer">Active <span className="text-xs text-muted-foreground font-normal">(inactive people are hidden from the join page)</span></Label>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>Cancel</Button>
               <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>{editing ? 'Save' : 'Add'}</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* PIN reveal dialog — shown once after generation */}
+      <Dialog open={!!shownPin} onOpenChange={() => setShownPin(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-normal">
+              {shownPin?.name}'s PIN
+            </DialogTitle>
+            <DialogDescription>
+              Share this with {shownPin?.name}. It won't be shown again — they'll need it every time they join an event.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 text-center">
+            <p className="font-display text-7xl text-foreground tracking-[0.4em]">{shownPin?.pin}</p>
+          </div>
+          <DialogFooter>
+            <Button className="w-full" onClick={() => setShownPin(null)}>Done — I've shared it</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -609,7 +670,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
         <DialogContent className="max-w-sm max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display text-2xl font-normal">New Event</DialogTitle>
-            <DialogDescription>Name the evening and select who's coming.</DialogDescription>
+            <DialogDescription>Name the evening and optionally seed a few known attendees.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4 pt-1">
             <div className="space-y-1.5">
@@ -625,7 +686,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Attendees</Label>
+              <Label>Seed attendees <span className="text-muted-foreground font-normal text-xs">(optional — others join via the link)</span></Label>
               <div className="space-y-1 max-h-48 overflow-y-auto rounded-md border border-input p-2">
                 {activePeople.map(p => (
                   <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded cursor-pointer hover:bg-muted/40">

@@ -46,6 +46,7 @@ import type {
   Member,
   Person,
   PersonInput,
+  PersonPin,
   SessionInput,
   SessionResult,
   Settlement
@@ -883,6 +884,57 @@ export const useDeletePerson = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeletePersonMutationOptions(options));
+    }
+
+export const getResetPersonPinUrl = (id: number) => {
+  return `/api/people/${id}/pin`
+}
+
+/**
+ * @summary Generate or reset a person's personal PIN (host only).
+ * Returns the plaintext PIN once — store it and share with the person.
+ */
+export const resetPersonPin = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PersonPin> => {
+  return customFetch<PersonPin>(getResetPersonPinUrl(id), {
+    ...options,
+    method: 'POST',
+  });
+}
+
+export const getResetPersonPinMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['resetPersonPin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetPersonPin>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+          return resetPersonPin(id, requestOptions)
+        }
+
+  return { mutationFn, ...mutationOptions }
+}
+
+    export type ResetPersonPinMutationResult = NonNullable<Awaited<ReturnType<typeof resetPersonPin>>>
+    export type ResetPersonPinMutationError = ErrorType<void>
+
+    /**
+ * @summary Generate or reset a person's personal PIN (host only)
+ */
+export const useResetPersonPin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetPersonPin>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getResetPersonPinMutationOptions(options));
     }
 
 export const getListEventsUrl = () => {
