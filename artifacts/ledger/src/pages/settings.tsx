@@ -1,112 +1,141 @@
-import { useLocation, useParams } from "wouter";
-import { useGetEvent, useFreezeEvent, useUnfreezeEvent } from "@workspace/api-client-react";
-import { useLocalSession } from "@/hooks/use-local-session";
-import { TopNav } from "@/components/layout/nav";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-import { Copy, Snowflake, LogOut, CheckCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect } from 'react';
+import { useLocation, useParams, Link } from 'wouter';
+import { toast } from 'sonner';
+import { useGetEvent, useFreezeEvent, useUnfreezeEvent } from '@workspace/api-client-react';
+import { useLocalSession } from '@/hooks/use-local-session';
+import { useHostSession } from '@/hooks/use-host-session';
+import { useQueryClient } from '@tanstack/react-query';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 export default function SettingsPage() {
   const { token } = useParams<{ token: string }>();
   const [, setLocation] = useLocation();
-  const { session, setSession } = useLocalSession(token || "");
-  const { toast } = useToast();
+  const { session, setSession } = useLocalSession(token ?? '');
+  const { token: hostToken } = useHostSession();
   const queryClient = useQueryClient();
 
-  const { data: event } = useGetEvent(token || "");
-  const freeze = useFreezeEvent();
-  const unfreeze = useUnfreezeEvent();
+  const hostHeaders = (hostToken ? { 'x-host-token': hostToken } : {}) as Record<string, string>;
 
-  const [copied, setCopied] = useState(false);
+  const { data: event, isLoading } = useGetEvent(token ?? '', { query: { enabled: !!token } as any });
+  const freezeMutation = useFreezeEvent({ request: { headers: hostHeaders } });
+  const unfreezeMutation = useUnfreezeEvent({ request: { headers: hostHeaders } });
 
-  if (!event || !session) return null;
+  useEffect(() => {
+    if (!session) setLocation(`/e/${token}`);
+  }, [session, token, setLocation]);
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/e/${token}`;
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    toast({ title: "Link copied to clipboard" });
+  if (!session) return null;
+
+  const handleFreeze = () => {
+    if (!confirm('Close this event? No new expenses can be added.')) return;
+    freezeMutation.mutate({ token: token! }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [`/api/events/${token}`] });
+        toast.success('Event closed.');
+      },
+      onError: () => toast.error('Could not close event.'),
+    });
   };
 
-  const handleToggleFreeze = () => {
-    if (event.frozen) {
-      unfreeze.mutate({ token: token! }, {
-        onSuccess: () => {
-          toast({ title: "Event unfrozen" });
-          queryClient.invalidateQueries({ queryKey: ['/api/events', token] });
-        }
-      });
-    } else {
-      freeze.mutate({ token: token! }, {
-        onSuccess: () => {
-          toast({ title: "Event frozen" });
-          queryClient.invalidateQueries({ queryKey: ['/api/events', token] });
-        }
-      });
-    }
+  const handleUnfreeze = () => {
+    unfreezeMutation.mutate({ token: token! }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: [`/api/events/${token}`] });
+        toast.success('Event reopened.');
+      },
+      onError: () => toast.error('Could not reopen event.'),
+    });
   };
 
   const handleLeave = () => {
     setSession(null);
-    setLocation("/");
+    setLocation('/');
   };
 
   return (
-    <div className="min-h-[100dvh] bg-background">
-      <TopNav title="Settings" token={token!} showBack backTo={`/e/${token}/dashboard`} />
+    <div className="min-h-dvh bg-background transition-page">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <Link href={`/e/${token}/dashboard`}>
+            <button className="p-1 rounded-md hover:bg-muted/40 transition-colors text-muted-foreground">
+              <ArrowLeft size={18} />
+            </button>
+          </Link>
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">{event?.name}</p>
+            <h1 className="font-display text-xl text-foreground">Settings</h1>
+          </div>
+        </div>
+      </header>
 
-      <main className="px-4 py-6 space-y-6 max-w-lg mx-auto">
-        <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Share Event</h2>
-          <Card className="p-4 bg-card border-border/50">
-            <p className="text-sm mb-4 text-muted-foreground">Invite friends by sharing this link.</p>
-            <div className="flex gap-2">
-              <div className="flex-1 bg-input rounded-xl px-3 flex items-center overflow-hidden">
-                <span className="text-sm truncate w-full text-foreground/80">{window.location.origin}/e/{token}</span>
-              </div>
-              <Button onClick={handleCopyLink} variant="secondary" className="px-4 shrink-0">
-                {copied ? <CheckCircle className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
-              </Button>
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {/* Event info */}
+        <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Event</p>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Name</span>
+              <span className="font-medium text-foreground">{event?.name}</span>
             </div>
-          </Card>
-        </section>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Status</span>
+              <span className={`font-medium ${event?.frozen ? 'text-muted-foreground' : 'text-green-700'}`}>
+                {event?.frozen ? 'Closed' : 'Open'}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Members</span>
+              <span className="font-medium text-foreground">{event?.memberCount}</span>
+            </div>
+          </div>
+        </div>
 
-        {session.isHost && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Host Controls</h2>
-            <Card className="bg-card border-border/50 divide-y divide-border/50">
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Freeze Event</p>
-                  <p className="text-xs text-muted-foreground">Stop new expenses from being added.</p>
-                </div>
-                <Button 
-                  variant={event.frozen ? "secondary" : "destructive"} 
-                  onClick={handleToggleFreeze}
-                  disabled={freeze.isPending || unfreeze.isPending}
-                >
-                  <Snowflake className="h-4 w-4 mr-2" />
-                  {event.frozen ? "Unfreeze" : "Freeze"}
-                </Button>
-              </div>
-            </Card>
-          </section>
+        {/* Host actions (only shown if user has host token) */}
+        {hostToken && (
+          <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Host Controls</p>
+            {event?.frozen ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleUnfreeze}
+                disabled={unfreezeMutation.isPending}
+              >
+                {unfreezeMutation.isPending ? 'Reopening…' : 'Reopen Event'}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full text-muted-foreground"
+                onClick={handleFreeze}
+                disabled={freezeMutation.isPending}
+              >
+                {freezeMutation.isPending ? 'Closing…' : 'Close Event'}
+              </Button>
+            )}
+          </div>
         )}
 
-        <section className="pt-8">
-          <Button 
-            variant="ghost" 
-            className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 h-14 text-lg"
-            onClick={handleLeave}
-          >
-            <LogOut className="h-5 w-5 mr-2" />
+        {/* Current session */}
+        <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">You</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">{session.memberName}</p>
+              {session.isHost && <p className="text-xs text-muted-foreground">Host</p>}
+            </div>
+          </div>
+          {session.personalPin && (
+            <div className="rounded-lg bg-muted/50 px-3 py-2 space-y-0.5">
+              <p className="text-xs text-muted-foreground">Your PIN (for other devices)</p>
+              <p className="font-display text-2xl tracking-widest text-foreground">{session.personalPin}</p>
+            </div>
+          )}
+          <Button variant="outline" className="w-full" onClick={handleLeave}>
             Leave Event
           </Button>
-        </section>
+        </div>
       </main>
     </div>
   );

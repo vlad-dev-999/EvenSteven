@@ -1,10 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { eventsTable, membersTable, familiesTable } from "@workspace/db";
-import {
-  ListMembersResponse,
-} from "@workspace/api-zod";
+import { eventsTable, membersTable, familiesTable, housesTable } from "@workspace/db";
 import { logActivity } from "../lib/activity";
 
 const router: IRouter = Router();
@@ -26,28 +23,37 @@ router.get("/events/:token/members", async (req, res): Promise<void> => {
       name: membersTable.name,
       familyId: membersTable.familyId,
       familyName: familiesTable.name,
+      houseId: membersTable.houseId,
+      houseName: housesTable.name,
+      houseCrest: housesTable.crest,
+      houseAccentColor: housesTable.accentColor,
       isHost: membersTable.isHost,
       approvedAt: membersTable.approvedAt,
+      claimed: membersTable.claimedAt,
       createdAt: membersTable.createdAt,
     })
     .from(membersTable)
     .leftJoin(familiesTable, eq(membersTable.familyId, familiesTable.id))
+    .leftJoin(housesTable, eq(membersTable.houseId, housesTable.id))
     .where(eq(membersTable.eventId, event.id))
     .orderBy(membersTable.createdAt);
 
   res.json(
-    ListMembersResponse.parse(
-      members.map((m) => ({
-        id: m.id,
-        eventId: m.eventId,
-        name: m.name,
-        familyId: m.familyId ?? null,
-        familyName: m.familyName ?? null,
-        isHost: m.isHost,
-        approved: !!m.approvedAt,
-        createdAt: m.createdAt,
-      })),
-    ),
+    members.map((m) => ({
+      id: m.id,
+      eventId: m.eventId,
+      name: m.name,
+      familyId: m.familyId ?? null,
+      familyName: m.familyName ?? null,
+      houseId: m.houseId ?? null,
+      houseName: m.houseName ?? null,
+      houseCrest: m.houseCrest ?? null,
+      houseAccentColor: m.houseAccentColor ?? null,
+      isHost: m.isHost,
+      approved: !!m.approvedAt,
+      claimed: !!m.claimed,
+      createdAt: m.createdAt,
+    })),
   );
 });
 

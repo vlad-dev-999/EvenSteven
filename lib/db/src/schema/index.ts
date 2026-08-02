@@ -1,3 +1,5 @@
+export * from "./houses";
+export * from "./people";
 export * from "./events";
 export * from "./families";
 export * from "./members";

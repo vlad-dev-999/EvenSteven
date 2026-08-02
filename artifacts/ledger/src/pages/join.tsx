@@ -1,239 +1,334 @@
-import { useEffect, useState } from "react";
-import { useLocation, useParams } from "wouter";
-import { 
-  useGetEvent, 
-  useListMembers, 
-  useSetSession,
-  useCreateJoinRequest
-} from "@workspace/api-client-react";
-import { useLocalSession } from "@/hooks/use-local-session";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, Plus } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { useLocation, useParams } from 'wouter';
+import { toast } from 'sonner';
+import { useGetEvent, useGetIdentityOptions, useIdentifyMember } from '@workspace/api-client-react';
+import type { IdentityHouse, IdentityMember } from '@workspace/api-client-react';
+import { useLocalSession } from '@/hooks/use-local-session';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+
+function getInitials(name: string) {
+  return name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+}
 
 export default function JoinPage() {
   const { token } = useParams<{ token: string }>();
   const [, setLocation] = useLocation();
-  const { session, setSession } = useLocalSession(token || "");
-  const { toast } = useToast();
+  const { session, setSession } = useLocalSession(token ?? '');
 
-  const { data: event, isLoading: eventLoading, error: eventError } = useGetEvent(token || "", {
-    query: {
-      enabled: !!token,
-      retry: false
-    }
+  const [expandedHouseId, setExpandedHouseId] = useState<number | null>(null);
+  const [selectedMember, setSelectedMember] = useState<IdentityMember | null>(null);
+  const [selectedHouseName, setSelectedHouseName] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [showNewPinDialog, setShowNewPinDialog] = useState(false);
+  const [newPersonalPin, setNewPersonalPin] = useState('');
+
+  const { data: event, isLoading: eventLoading, error: eventError } = useGetEvent(token ?? '', {
+    query: { enabled: !!token, retry: false } as any,
   });
 
-  const { data: members, isLoading: membersLoading } = useListMembers(token || "", {
-    query: {
-      enabled: !!token && !!event
-    }
+  const { data: options, isLoading: optionsLoading, refetch: refetchOptions } = useGetIdentityOptions(token ?? '', {
+    query: { enabled: !!token && !!event } as any,
   });
 
-  const setSessionMutation = useSetSession();
-  const createJoinRequest = useCreateJoinRequest();
+  const identifyMutation = useIdentifyMember();
 
-  // Redirect if already logged in for this event
+  // Redirect if already identified
   useEffect(() => {
-    if (session && event) {
+    if (session) {
       setLocation(`/e/${token}/dashboard`);
     }
-  }, [session, event, token, setLocation]);
-
-  const [selectedMember, setSelectedMember] = useState<any>(null);
-  const [pin, setPin] = useState("");
-  const [isPinDialogOpen, setIsPinDialogOpen] = useState(false);
-
-  const [isJoinDialogOpen, setIsJoinDialogOpen] = useState(false);
-  const [newMemberName, setNewMemberName] = useState("");
+  }, [session, token, setLocation]);
 
   if (eventError) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center p-4">
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold">Event Not Found</h1>
-          <p className="text-muted-foreground">This link might be invalid or the event was deleted.</p>
-          <Button onClick={() => setLocation("/")}>Go Home</Button>
+      <div className="min-h-dvh flex flex-col items-center justify-center p-6 bg-background">
+        <div className="max-w-sm text-center space-y-4">
+          <h1 className="font-display text-3xl text-foreground">
+            Event not found.
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            This link may have expired or the event was removed.
+          </p>
+          <Button variant="outline" onClick={() => setLocation('/')}>
+            Go home
+          </Button>
         </div>
       </div>
     );
   }
 
-  if (eventLoading || session) {
-    return <div className="flex min-h-[100dvh] items-center justify-center">Loading...</div>;
+  if (eventLoading || optionsLoading || session) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm animate-pulse">A moment…</p>
+      </div>
+    );
   }
 
-  const handleMemberClick = (member: any) => {
-    if (member.isHost) {
-      setSelectedMember(member);
-      setIsPinDialogOpen(true);
+  const handleMemberTap = (member: IdentityMember, house: IdentityHouse) => {
+    setSelectedMember(member);
+    setSelectedHouseName(house.name);
+
+    if (member.claimed) {
+      // Already claimed — ask for personal PIN
+      setPinInput('');
+      setShowPinDialog(true);
     } else {
-      // Non-host members can just set session directly, pass empty pin
-      authenticateMember(member.id, "");
+      // First time — claim identity
+      identifyMutation.mutate(
+        { token: token!, data: { memberId: member.id } },
+        {
+          onSuccess: (result) => {
+            if (result.personalPin) {
+              setNewPersonalPin(result.personalPin);
+              setShowNewPinDialog(true);
+              // Store session
+              setSession({
+                memberId: result.memberId,
+                memberName: result.memberName,
+                isHost: result.isHost,
+                personalPin: result.personalPin,
+              });
+            } else {
+              setSession({
+                memberId: result.memberId,
+                memberName: result.memberName,
+                isHost: result.isHost,
+              });
+              setLocation(`/e/${token}/dashboard`);
+            }
+          },
+          onError: (err: any) => {
+            const status = err?.status;
+            if (status === 409) {
+              // Race condition — someone else just claimed it
+              setPinInput('');
+              setShowPinDialog(true);
+              refetchOptions();
+            } else {
+              toast.error('Something went wrong. Please try again.');
+            }
+          },
+        },
+      );
     }
   };
 
-  const authenticateMember = (memberId: number, memberPin: string) => {
-    setSessionMutation.mutate({
-      token: token as string,
-      data: { memberId, pin: memberPin }
-    }, {
-      onSuccess: (memberData) => {
-        setSession({
-          memberId: memberData.id,
-          memberName: memberData.name,
-          isHost: memberData.isHost
-        });
-        setLocation(`/e/${token}/dashboard`);
-      },
-      onError: () => {
-        toast({
-          title: "Authentication Failed",
-          description: "Incorrect PIN or unable to join.",
-          variant: "destructive"
-        });
-      }
-    });
-  };
-
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinVerify = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedMember) {
-      authenticateMember(selectedMember.id, pin);
-    }
-  };
+    if (!selectedMember) return;
 
-  const handleNewJoinRequest = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMemberName.trim()) return;
-
-    createJoinRequest.mutate({
-      token: token as string,
-      data: { name: newMemberName.trim() }
-    }, {
-      onSuccess: (res) => {
-        if (res.type === 'existing_member' && res.member) {
-          // If the API recognized the name, log them in (if not host, otherwise require PIN)
-          if (res.member.isHost) {
-             setSelectedMember(res.member);
-             setIsJoinDialogOpen(false);
-             setIsPinDialogOpen(true);
-          } else {
-             authenticateMember(res.member.id, "");
-          }
-        } else {
-          toast({
-            title: "Request Sent",
-            description: "Ask the host to approve your request.",
+    identifyMutation.mutate(
+      { token: token!, data: { memberId: selectedMember.id, personalPin: pinInput } },
+      {
+        onSuccess: (result) => {
+          setSession({
+            memberId: result.memberId,
+            memberName: result.memberName,
+            isHost: result.isHost,
+            personalPin: pinInput,
           });
-          setIsJoinDialogOpen(false);
-          setNewMemberName("");
-        }
+          setShowPinDialog(false);
+          setLocation(`/e/${token}/dashboard`);
+        },
+        onError: () => {
+          toast.error('Incorrect PIN. Try again.');
+          setPinInput('');
+        },
       },
-      onError: () => {
-        toast({
-          title: "Request Failed",
-          description: "Could not send join request.",
-          variant: "destructive"
-        });
-      }
-    });
+    );
   };
+
+  const handleNewPinDismiss = () => {
+    setShowNewPinDialog(false);
+    setLocation(`/e/${token}/dashboard`);
+  };
+
+  const houses = options?.houses ?? [];
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background p-6">
-      <div className="flex-1 w-full max-w-md mx-auto space-y-8 py-12">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">{event?.name}</h1>
-          <p className="text-muted-foreground text-lg">Who are you?</p>
+    <div className="min-h-dvh bg-background px-4 py-10 transition-page">
+      <div className="max-w-md mx-auto space-y-8">
+        {/* Header */}
+        <div className="space-y-1 pt-4">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
+            {options?.eventName ?? event?.name}
+          </p>
+          <h1 className="font-display text-4xl text-foreground">
+            Who's joining tonight?
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Select your house, then tap your name.
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {members?.map(member => (
-            <Card 
-              key={member.id}
-              className="flex flex-col items-center justify-center p-6 gap-3 cursor-pointer hover:bg-muted/50 transition-colors active:scale-95"
-              onClick={() => handleMemberClick(member)}
-            >
-              <Avatar className="h-16 w-16">
-                <AvatarFallback className="text-xl bg-secondary text-secondary-foreground">
-                  {member.name.substring(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="font-medium text-center line-clamp-1">{member.name}</span>
-            </Card>
-          ))}
+        {/* House cards */}
+        {houses.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-8 text-center space-y-2">
+            <p className="font-display text-2xl text-foreground">
+              The evening awaits.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              No attendees have been added yet. The host will prepare the event shortly.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {houses.map((house) => {
+              const isExpanded = expandedHouseId === house.id;
+              const accentStyle = house.accentColor
+                ? { borderLeftColor: house.accentColor }
+                : {};
 
-          <Card 
-            className="flex flex-col items-center justify-center p-6 gap-3 cursor-pointer border-dashed bg-transparent hover:bg-muted/20 transition-colors active:scale-95"
-            onClick={() => setIsJoinDialogOpen(true)}
-          >
-            <div className="h-16 w-16 rounded-full border-2 border-dashed flex items-center justify-center text-muted-foreground">
-              <Plus className="h-8 w-8" />
-            </div>
-            <span className="font-medium text-center text-muted-foreground">New Member</span>
-          </Card>
-        </div>
+              return (
+                <div
+                  key={house.id}
+                  className="rounded-xl border border-border bg-card overflow-hidden transition-all"
+                  style={{ borderLeftWidth: '3px', ...accentStyle }}
+                >
+                  {/* House header */}
+                  <button
+                    className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-muted/30 transition-colors"
+                    onClick={() => setExpandedHouseId(isExpanded ? null : house.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg" aria-hidden>🏠</span>
+                      <span className="font-medium text-foreground">{house.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {house.members.length} {house.members.length === 1 ? 'person' : 'people'}
+                      </span>
+                    </div>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className={cn(
+                        'text-muted-foreground transition-transform duration-200',
+                        isExpanded && 'rotate-180'
+                      )}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {/* Members list */}
+                  {isExpanded && (
+                    <div className="border-t border-border divide-y divide-border">
+                      {house.members.map((member) => (
+                        <button
+                          key={member.id}
+                          className={cn(
+                            'w-full flex items-center gap-4 px-5 py-3 text-left transition-colors',
+                            'hover:bg-muted/40',
+                            member.claimed && 'opacity-60'
+                          )}
+                          onClick={() => handleMemberTap(member, house)}
+                          disabled={identifyMutation.isPending && selectedMember?.id === member.id}
+                        >
+                          {/* Avatar */}
+                          <div
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-semibold text-primary-foreground shrink-0"
+                            style={{ backgroundColor: house.accentColor ?? 'hsl(var(--primary))' }}
+                          >
+                            {getInitials(member.name)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-foreground">
+                              {member.name}
+                              {member.isHost && (
+                                <span className="ml-2 text-xs text-muted-foreground font-normal">
+                                  host
+                                </span>
+                              )}
+                            </p>
+                            {member.claimed && (
+                              <p className="text-xs text-muted-foreground">
+                                Joining from another device?
+                              </p>
+                            )}
+                          </div>
+                          {identifyMutation.isPending && selectedMember?.id === member.id ? (
+                            <span className="text-xs text-muted-foreground animate-pulse">…</span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <Dialog open={isPinDialogOpen} onOpenChange={setIsPinDialogOpen}>
-        <DialogContent>
+      {/* PIN verification dialog */}
+      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Host Authentication</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-normal">
+              Welcome back, {selectedMember?.name}.
+            </DialogTitle>
             <DialogDescription>
-              Enter the host PIN for {selectedMember?.name}.
+              This identity was claimed on another device. Enter your personal PIN to continue.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handlePinSubmit} className="space-y-4">
-            <Input 
-              type="password"
-              placeholder="PIN"
-              value={pin}
-              onChange={(e) => setPin(e.target.value)}
+          <form onSubmit={handlePinVerify} className="space-y-4 pt-2">
+            <Input
+              type="tel"
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              placeholder="4-digit PIN"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
               autoFocus
               required
+              className="text-center text-lg tracking-widest"
             />
             <DialogFooter>
-              <Button type="button" variant="secondary" onClick={() => setIsPinDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={setSessionMutation.isPending}>
-                {setSessionMutation.isPending ? "Verifying..." : "Enter"}
+              <Button type="button" variant="outline" onClick={() => setShowPinDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={pinInput.length !== 4 || identifyMutation.isPending}>
+                {identifyMutation.isPending ? 'Verifying…' : 'Continue'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isJoinDialogOpen} onOpenChange={setIsJoinDialogOpen}>
-        <DialogContent>
+      {/* New PIN reveal dialog */}
+      <Dialog open={showNewPinDialog} onOpenChange={setShowNewPinDialog}>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Join Event</DialogTitle>
+            <DialogTitle className="font-display text-2xl font-normal">
+              Your personal PIN
+            </DialogTitle>
             <DialogDescription>
-              Enter your name. The host will need to approve you.
+              Save this four-digit PIN. If you open this event on another device,
+              you'll need it to reclaim your identity.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleNewJoinRequest} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Your Name</Label>
-              <Input 
-                placeholder="e.g. John Doe"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="secondary" onClick={() => setIsJoinDialogOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={createJoinRequest.isPending}>
-                {createJoinRequest.isPending ? "Sending..." : "Request to Join"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <div className="py-4 text-center">
+            <p className="font-display text-6xl text-foreground tracking-[0.3em]">
+              {newPersonalPin}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button className="w-full" onClick={handleNewPinDismiss}>
+              I've noted it — continue
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

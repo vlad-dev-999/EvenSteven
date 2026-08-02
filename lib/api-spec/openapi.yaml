@@ -2,20 +2,28 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: Ledger - Collaborative expense settlement API
+  version: 0.2.0
+  description: EvenSteven - Collaborative expense settlement API
+
 servers:
   - url: /api
     description: Base API path
+
 tags:
   - name: health
     description: Health operations
+  - name: host
+    description: Host console authentication
+  - name: houses
+    description: Permanent house directory
+  - name: people
+    description: Permanent people directory
   - name: events
     description: Event management
   - name: members
     description: Member management
   - name: families
-    description: Family group management
+    description: Event-level house group management
   - name: expenses
     description: Expense management
   - name: join-requests
@@ -23,7 +31,7 @@ tags:
   - name: settlements
     description: Balance and settlement calculations
   - name: activity
-    description: Activity log
+    description: Timeline / activity log
 
 paths:
   /healthz:
@@ -39,11 +47,264 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  # ── Host auth ──────────────────────────────────────────────────────────────
+
+  /host/auth:
+    post:
+      operationId: hostAuth
+      tags: [host]
+      summary: Exchange HOST_PASSWORD for a host token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HostAuthInput"
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostAuthResult"
+        "401":
+          description: Incorrect password
+
+  /host/auth/check:
+    get:
+      operationId: checkHostAuth
+      tags: [host]
+      summary: Verify an existing host token
+      parameters:
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Token validity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HostAuthCheck"
+
+  # ── Houses ────────────────────────────────────────────────────────────────
+
+  /houses:
+    get:
+      operationId: listHouses
+      tags: [houses]
+      summary: List all houses
+      responses:
+        "200":
+          description: Houses list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/House"
+    post:
+      operationId: createHouse
+      tags: [houses]
+      summary: Create a house (host only)
+      parameters:
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HouseInput"
+      responses:
+        "201":
+          description: House created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/House"
+
+  /houses/{id}:
+    patch:
+      operationId: updateHouse
+      tags: [houses]
+      summary: Update a house (host only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HouseInput"
+      responses:
+        "200":
+          description: House updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/House"
+        "404":
+          description: House not found
+    delete:
+      operationId: deleteHouse
+      tags: [houses]
+      summary: Delete a house (host only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: House not found
+
+  # ── People ────────────────────────────────────────────────────────────────
+
+  /people:
+    get:
+      operationId: listPeople
+      tags: [people]
+      summary: List all people with house info
+      responses:
+        "200":
+          description: People list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Person"
+    post:
+      operationId: createPerson
+      tags: [people]
+      summary: Create a person (host only)
+      parameters:
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonInput"
+      responses:
+        "201":
+          description: Person created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+
+  /people/{id}:
+    patch:
+      operationId: updatePerson
+      tags: [people]
+      summary: Update a person (host only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PersonInput"
+      responses:
+        "200":
+          description: Person updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Person"
+        "404":
+          description: Person not found
+    delete:
+      operationId: deletePerson
+      tags: [people]
+      summary: Delete a person (host only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Person not found
+
+  # ── Events ────────────────────────────────────────────────────────────────
+
   /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List all events (host only)
+      parameters:
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Events list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
     post:
       operationId: createEvent
       tags: [events]
-      summary: Create a new event
+      summary: Create a new event (host only)
+      parameters:
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -79,11 +340,61 @@ paths:
         "404":
           description: Event not found
 
+  /events/{token}/identity-options:
+    get:
+      operationId: getIdentityOptions
+      tags: [events]
+      summary: Get houses and their members for identity selection
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Identity options
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentityOptions"
+        "404":
+          description: Event not found
+
+  /events/{token}/identify:
+    post:
+      operationId: identifyMember
+      tags: [events]
+      summary: Claim identity or verify personal PIN
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IdentifyInput"
+      responses:
+        "200":
+          description: Identity confirmed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IdentifyResult"
+        "401":
+          description: Incorrect personal PIN
+        "409":
+          description: Identity already claimed, PIN required
+
   /events/{token}/session:
     post:
       operationId: setSession
       tags: [events]
-      summary: Set current member session (authenticate as a member)
+      summary: Authenticate as a member (legacy)
       parameters:
         - name: token
           in: path
@@ -134,6 +445,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Event frozen
@@ -153,6 +469,11 @@ paths:
           required: true
           schema:
             type: string
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Event unfrozen
@@ -160,6 +481,27 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Event"
+
+  /events/{token}/summary:
+    get:
+      operationId: getEventSummary
+      tags: [events]
+      summary: Get event statistics
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventSummary"
+
+  # ── Members ───────────────────────────────────────────────────────────────
 
   /events/{token}/members:
     get:
@@ -201,12 +543,18 @@ paths:
       responses:
         "204":
           description: Member removed
+        "400":
+          description: Cannot remove host
+        "404":
+          description: Member not found
+
+  # ── Families ──────────────────────────────────────────────────────────────
 
   /events/{token}/families:
     get:
       operationId: listFamilies
       tags: [families]
-      summary: List families for an event
+      summary: List all families (house groups) in an event
       parameters:
         - name: token
           in: path
@@ -266,11 +614,13 @@ paths:
         "204":
           description: Family deleted
 
+  # ── Join requests ─────────────────────────────────────────────────────────
+
   /events/{token}/join-requests:
     get:
       operationId: listJoinRequests
       tags: [join-requests]
-      summary: List pending join requests (host only)
+      summary: List join requests
       parameters:
         - name: token
           in: path
@@ -279,7 +629,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Join requests list
+          description: Join requests
           content:
             application/json:
               schema:
@@ -289,7 +639,7 @@ paths:
     post:
       operationId: createJoinRequest
       tags: [join-requests]
-      summary: Submit a join request or rejoin as existing member
+      summary: Submit a join request
       parameters:
         - name: token
           in: path
@@ -303,18 +653,18 @@ paths:
             schema:
               $ref: "#/components/schemas/JoinRequestInput"
       responses:
-        "201":
-          description: Join request submitted or member matched
+        "200":
+          description: Join request submitted or matched
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/JoinResult"
+                $ref: "#/components/schemas/JoinRequestResult"
 
   /events/{token}/join-requests/{requestId}:
     patch:
       operationId: updateJoinRequest
       tags: [join-requests]
-      summary: Approve or reject a join request (host only)
+      summary: Approve or reject a join request
       parameters:
         - name: token
           in: path
@@ -334,17 +684,19 @@ paths:
               $ref: "#/components/schemas/JoinRequestUpdate"
       responses:
         "200":
-          description: Join request updated
+          description: Updated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/JoinRequest"
 
+  # ── Expenses ──────────────────────────────────────────────────────────────
+
   /events/{token}/expenses:
     get:
       operationId: listExpenses
       tags: [expenses]
-      summary: List all expenses for an event
+      summary: List all expenses in an event
       parameters:
         - name: token
           in: path
@@ -363,7 +715,7 @@ paths:
     post:
       operationId: createExpense
       tags: [expenses]
-      summary: Add a new expense
+      summary: Add an expense
       parameters:
         - name: token
           in: path
@@ -388,7 +740,7 @@ paths:
     patch:
       operationId: updateExpense
       tags: [expenses]
-      summary: Edit an expense
+      summary: Update an expense
       parameters:
         - name: token
           in: path
@@ -405,7 +757,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ExpenseUpdate"
+              $ref: "#/components/schemas/ExpenseInput"
       responses:
         "200":
           description: Expense updated
@@ -416,7 +768,7 @@ paths:
     delete:
       operationId: deleteExpense
       tags: [expenses]
-      summary: Delete an expense (host or expense owner)
+      summary: Delete an expense
       parameters:
         - name: token
           in: path
@@ -430,13 +782,15 @@ paths:
             type: integer
       responses:
         "204":
-          description: Expense deleted
+          description: Deleted
+
+  # ── Settlements ───────────────────────────────────────────────────────────
 
   /events/{token}/balances:
     get:
       operationId: getBalances
       tags: [settlements]
-      summary: Get current balances for all members
+      summary: Get net balance for each member
       parameters:
         - name: token
           in: path
@@ -445,7 +799,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Current balances
+          description: Balance summary
           content:
             application/json:
               schema:
@@ -455,7 +809,7 @@ paths:
     get:
       operationId: getSettlements
       tags: [settlements]
-      summary: Get minimum transfer settlement plan
+      summary: Get minimum-transfer settlement plan
       parameters:
         - name: token
           in: path
@@ -464,7 +818,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Settlement plan
+          description: Settlement transfers
           content:
             application/json:
               schema:
@@ -476,7 +830,7 @@ paths:
     get:
       operationId: listActivity
       tags: [activity]
-      summary: Get activity log for an event
+      summary: Get timeline / activity log
       parameters:
         - name: token
           in: path
@@ -485,7 +839,7 @@ paths:
             type: string
       responses:
         "200":
-          description: Activity log
+          description: Activity entries
           content:
             application/json:
               schema:
@@ -493,37 +847,124 @@ paths:
                 items:
                   $ref: "#/components/schemas/ActivityEntry"
 
-  /events/{token}/summary:
-    get:
-      operationId: getEventSummary
-      tags: [events]
-      summary: Get event summary stats
-      parameters:
-        - name: token
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: Event summary
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/EventSummary"
-
 components:
   schemas:
+
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
+
+    # ── Host ──────────────────────────────────────────────────────────────
+
+    HostAuthInput:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          minLength: 1
+
+    HostAuthResult:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    HostAuthCheck:
+      type: object
+      required: [valid]
+      properties:
+        valid:
+          type: boolean
+
+    # ── Houses ────────────────────────────────────────────────────────────
+
+    House:
+      type: object
+      required: [id, name, crest, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        crest:
+          type: string
+        accentColor:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    HouseInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        crest:
+          type: string
+        accentColor:
+          type: string
+          nullable: true
+
+    # ── People ────────────────────────────────────────────────────────────
+
+    Person:
+      type: object
+      required: [id, name, houseId, active, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        houseId:
+          type: integer
+        houseName:
+          type: string
+          nullable: true
+        houseCrest:
+          type: string
+          nullable: true
+        houseAccentColor:
+          type: string
+          nullable: true
+        avatar:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    PersonInput:
+      type: object
+      required: [name, houseId]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        houseId:
+          type: integer
+        avatar:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+
+    # ── Events ────────────────────────────────────────────────────────────
 
     Event:
       type: object
+      required: [id, name, token, frozen, memberCount, totalExpenses, createdAt]
       properties:
         id:
           type: integer
@@ -540,47 +981,112 @@ components:
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - name
-        - token
-        - frozen
-        - memberCount
-        - totalExpenses
-        - createdAt
 
     EventInput:
       type: object
+      required: [name, hostPersonId, attendeePersonIds]
       properties:
         name:
           type: string
           minLength: 1
           maxLength: 100
-        hostName:
-          type: string
-          minLength: 1
-          maxLength: 100
-      required:
-        - name
-        - hostName
+        hostPersonId:
+          type: integer
+        attendeePersonIds:
+          type: array
+          items:
+            type: integer
+          minItems: 1
 
     EventCreated:
       type: object
+      required: [event, pin, hostMember]
       properties:
         event:
           $ref: "#/components/schemas/Event"
         pin:
           type: string
-          description: 4-digit PIN for the host
+          description: 4-digit PIN for sharing
         hostMember:
           $ref: "#/components/schemas/Member"
-      required:
-        - event
-        - pin
-        - hostMember
+
+    IdentityOptions:
+      type: object
+      required: [eventName, eventPin, houses]
+      properties:
+        eventName:
+          type: string
+        eventPin:
+          type: string
+        houses:
+          type: array
+          items:
+            $ref: "#/components/schemas/IdentityHouse"
+
+    IdentityHouse:
+      type: object
+      required: [id, name, crest, members]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        crest:
+          type: string
+        accentColor:
+          type: string
+          nullable: true
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/IdentityMember"
+
+    IdentityMember:
+      type: object
+      required: [id, name, claimed, isHost]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        claimed:
+          type: boolean
+        avatar:
+          type: string
+          nullable: true
+        isHost:
+          type: boolean
+
+    IdentifyInput:
+      type: object
+      required: [memberId]
+      properties:
+        memberId:
+          type: integer
+        personalPin:
+          type: string
+          nullable: true
+
+    IdentifyResult:
+      type: object
+      required: [memberId, memberName, isHost]
+      properties:
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        isHost:
+          type: boolean
+        personalPin:
+          type: string
+          nullable: true
+          description: Returned only on first claim
+
+    # ── Members ───────────────────────────────────────────────────────────
 
     Member:
       type: object
+      required: [id, eventId, name, isHost, approved, claimed, createdAt]
       properties:
         id:
           type: integer
@@ -589,28 +1095,60 @@ components:
         name:
           type: string
         familyId:
-          type: ["integer", "null"]
+          type: integer
+          nullable: true
         familyName:
-          type: ["string", "null"]
+          type: string
+          nullable: true
+        houseId:
+          type: integer
+          nullable: true
+        houseName:
+          type: string
+          nullable: true
+        houseCrest:
+          type: string
+          nullable: true
+        houseAccentColor:
+          type: string
+          nullable: true
         isHost:
           type: boolean
         approved:
           type: boolean
+        claimed:
+          type: boolean
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - eventId
-        - name
-        - familyId
-        - familyName
-        - isHost
-        - approved
-        - createdAt
+
+    SessionInput:
+      type: object
+      required: [memberId, pin]
+      properties:
+        memberId:
+          type: integer
+        pin:
+          type: string
+
+    SessionResult:
+      type: object
+      required: [authenticated]
+      properties:
+        authenticated:
+          type: boolean
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        isHost:
+          type: boolean
+
+    # ── Families ──────────────────────────────────────────────────────────
 
     Family:
       type: object
+      required: [id, eventId, name, createdAt]
       properties:
         id:
           type: integer
@@ -618,63 +1156,24 @@ components:
           type: integer
         name:
           type: string
-        memberCount:
-          type: integer
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - eventId
-        - name
-        - memberCount
-        - createdAt
 
     FamilyInput:
       type: object
+      required: [name]
       properties:
         name:
           type: string
           minLength: 1
           maxLength: 100
-      required:
-        - name
 
-    SessionInput:
-      type: object
-      properties:
-        memberId:
-          type: integer
-        pin:
-          type: string
-      required:
-        - memberId
-        - pin
-
-    SessionResult:
-      type: object
-      properties:
-        member:
-          type: ["object", "null"]
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-            isHost:
-              type: boolean
-          required:
-            - id
-            - name
-            - isHost
-        authenticated:
-          type: boolean
-      required:
-        - member
-        - authenticated
+    # ── Join requests ─────────────────────────────────────────────────────
 
     JoinRequest:
       type: object
+      required: [id, eventId, name, status, createdAt]
       properties:
         id:
           type: integer
@@ -688,71 +1187,41 @@ components:
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - eventId
-        - name
-        - status
-        - createdAt
 
     JoinRequestInput:
       type: object
+      required: [name]
       properties:
         name:
           type: string
           minLength: 1
           maxLength: 100
-      required:
-        - name
+
+    JoinRequestResult:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [new_request, existing_member]
+        joinRequest:
+          $ref: "#/components/schemas/JoinRequest"
+        member:
+          $ref: "#/components/schemas/Member"
 
     JoinRequestUpdate:
       type: object
+      required: [status]
       properties:
         status:
           type: string
           enum: [approved, rejected]
-        familyId:
-          type: ["integer", "null"]
-      required:
-        - status
 
-    JoinResult:
-      type: object
-      properties:
-        type:
-          type: string
-          enum: [existing_member, join_request_created]
-        member:
-          type: ["object", "null"]
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-            isHost:
-              type: boolean
-          required:
-            - id
-            - name
-            - isHost
-        joinRequest:
-          type: ["object", "null"]
-          properties:
-            id:
-              type: integer
-            name:
-              type: string
-            status:
-              type: string
-          required:
-            - id
-            - name
-            - status
-      required:
-        - type
+    # ── Expenses ──────────────────────────────────────────────────────────
 
     Expense:
       type: object
+      required: [id, eventId, paidByMemberId, paidByMemberName, category, amount, splitType, participants, createdAt, updatedAt]
       properties:
         id:
           type: integer
@@ -760,38 +1229,24 @@ components:
           type: integer
         paidByMemberId:
           type: integer
-        paidByName:
+        paidByMemberName:
           type: string
         category:
           type: string
           enum: [tickets, food, drinks, snacks, fuel, other]
         amount:
           type: integer
-          description: Amount in smallest currency unit (e.g. paise/cents)
+          description: Amount in paise
         description:
-          type: ["string", "null"]
+          type: string
+          nullable: true
         splitType:
           type: string
           enum: [everyone, families, members]
-        participantIds:
-          type: array
-          items:
-            type: integer
         participants:
           type: array
           items:
-            type: object
-            properties:
-              memberId:
-                type: integer
-              memberName:
-                type: string
-              shareAmount:
-                type: integer
-            required:
-              - memberId
-              - memberName
-              - shareAmount
+            $ref: "#/components/schemas/ExpenseParticipant"
         createdByMemberId:
           type: integer
         createdAt:
@@ -800,23 +1255,21 @@ components:
         updatedAt:
           type: string
           format: date-time
-      required:
-        - id
-        - eventId
-        - paidByMemberId
-        - paidByName
-        - category
-        - amount
-        - description
-        - splitType
-        - participantIds
-        - participants
-        - createdByMemberId
-        - createdAt
-        - updatedAt
+
+    ExpenseParticipant:
+      type: object
+      required: [memberId, memberName, shareAmount]
+      properties:
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        shareAmount:
+          type: integer
 
     ExpenseInput:
       type: object
+      required: [paidByMemberId, category, amount, splitType, createdByMemberId]
       properties:
         paidByMemberId:
           type: integer
@@ -828,6 +1281,7 @@ components:
           minimum: 1
         description:
           type: string
+          nullable: true
         splitType:
           type: string
           enum: [everyone, families, members]
@@ -835,45 +1289,33 @@ components:
           type: array
           items:
             type: integer
-          description: Required when splitType is families or members
+          nullable: true
         familyIds:
           type: array
           items:
             type: integer
-          description: Required when splitType is families
-      required:
-        - paidByMemberId
-        - category
-        - amount
-        - splitType
+          nullable: true
+        createdByMemberId:
+          type: integer
 
-    ExpenseUpdate:
+    # ── Settlements ───────────────────────────────────────────────────────
+
+    BalanceSummary:
       type: object
+      required: [totalExpenses, expenseCount, memberBalances]
       properties:
-        paidByMemberId:
+        totalExpenses:
           type: integer
-        category:
-          type: string
-          enum: [tickets, food, drinks, snacks, fuel, other]
-        amount:
+        expenseCount:
           type: integer
-          minimum: 1
-        description:
-          type: string
-        splitType:
-          type: string
-          enum: [everyone, families, members]
-        participantIds:
+        memberBalances:
           type: array
           items:
-            type: integer
-        familyIds:
-          type: array
-          items:
-            type: integer
+            $ref: "#/components/schemas/MemberBalance"
 
     MemberBalance:
       type: object
+      required: [memberId, memberName, totalPaid, totalOwed, netBalance]
       properties:
         memberId:
           type: integer
@@ -885,32 +1327,10 @@ components:
           type: integer
         netBalance:
           type: integer
-          description: Positive = credit, negative = debit
-      required:
-        - memberId
-        - memberName
-        - totalPaid
-        - totalOwed
-        - netBalance
-
-    BalanceSummary:
-      type: object
-      properties:
-        totalExpenses:
-          type: integer
-        expenseCount:
-          type: integer
-        memberBalances:
-          type: array
-          items:
-            $ref: "#/components/schemas/MemberBalance"
-      required:
-        - totalExpenses
-        - expenseCount
-        - memberBalances
 
     Settlement:
       type: object
+      required: [fromMemberId, fromMemberName, toMemberId, toMemberName, amount]
       properties:
         fromMemberId:
           type: integer
@@ -922,40 +1342,36 @@ components:
           type: string
         amount:
           type: integer
-      required:
-        - fromMemberId
-        - fromMemberName
-        - toMemberId
-        - toMemberName
-        - amount
+
+    # ── Activity / Timeline ───────────────────────────────────────────────
 
     ActivityEntry:
       type: object
+      required: [id, eventId, action, metadata, createdAt]
       properties:
         id:
           type: integer
         eventId:
           type: integer
+        memberId:
+          type: integer
+          nullable: true
         memberName:
-          type: ["string", "null"]
+          type: string
+          nullable: true
         action:
           type: string
         metadata:
           type: object
-          additionalProperties: true
         createdAt:
           type: string
           format: date-time
-      required:
-        - id
-        - eventId
-        - memberName
-        - action
-        - metadata
-        - createdAt
+
+    # ── Summary ───────────────────────────────────────────────────────────
 
     EventSummary:
       type: object
+      required: [totalExpenses, expenseCount, memberCount, familyCount, categoryBreakdown, topPayers]
       properties:
         totalExpenses:
           type: integer
@@ -969,6 +1385,7 @@ components:
           type: array
           items:
             type: object
+            required: [category, total, count]
             properties:
               category:
                 type: string
@@ -976,14 +1393,11 @@ components:
                 type: integer
               count:
                 type: integer
-            required:
-              - category
-              - total
-              - count
         topPayers:
           type: array
           items:
             type: object
+            required: [memberId, memberName, totalPaid]
             properties:
               memberId:
                 type: integer
@@ -991,14 +1405,3 @@ components:
                 type: string
               totalPaid:
                 type: integer
-            required:
-              - memberId
-              - memberName
-              - totalPaid
-      required:
-        - totalExpenses
-        - expenseCount
-        - memberCount
-        - familyCount
-        - categoryBreakdown
-        - topPayers

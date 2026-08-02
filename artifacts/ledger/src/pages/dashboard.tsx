@@ -1,165 +1,230 @@
-import { useLocation, useParams } from "wouter";
-import { useGetEvent, useGetBalances, useListExpenses, getGetBalancesQueryKey } from "@workspace/api-client-react";
-import { useLocalSession } from "@/hooks/use-local-session";
-import { TopNav, BottomNav } from "@/components/layout/nav";
-import { formatCurrency, cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, Settings, TrendingUp, TrendingDown, CheckCircle2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect } from 'react';
+import { useLocation, useParams, Link } from 'wouter';
+import {
+  useGetEvent,
+  useGetBalances,
+  useListExpenses,
+  useListActivity,
+} from '@workspace/api-client-react';
+import { useLocalSession } from '@/hooks/use-local-session';
+import { Button } from '@/components/ui/button';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  tickets: '🎟', food: '🍽', drinks: '🥂', snacks: '🍿', fuel: '⛽', other: '📦',
+};
+
+const ACTION_HEADLINES: Record<string, (meta: any) => string> = {
+  event_created: (m) => `${m.hostName ?? 'The host'} started the evening.`,
+  expense_added: (m) => `${m.paidByName ?? 'Someone'} covered the ${m.category ?? 'expense'}.`,
+  expense_updated: (m) => `The ${m.category ?? 'expense'} was updated.`,
+  expense_deleted: (m) => `An expense was removed.`,
+  member_removed: (m) => `${m.memberName ?? 'A member'} left the event.`,
+  event_frozen: () => 'The evening is closed.',
+  event_unfrozen: () => 'The evening was reopened.',
+  join_request_approved: (m) => `${m.name ?? 'Someone'} joined the party.`,
+};
+
+const ACTION_CAPTIONS: Record<string, (meta: any) => string> = {
+  expense_added: (m) => [
+    m.category && `${m.category.charAt(0).toUpperCase() + m.category.slice(1)}`,
+    m.amount && formatCurrency(m.amount),
+    m.splitType && `Split ${m.splitType}`,
+  ].filter(Boolean).join(' · '),
+  expense_updated: (m) => `Amount: ${m.amount ? formatCurrency(m.amount) : '—'}`,
+  event_created: (m) => `Event "${m.eventName}" created.`,
+};
 
 export default function DashboardPage() {
   const { token } = useParams<{ token: string }>();
   const [, setLocation] = useLocation();
-  const { session } = useLocalSession(token || "");
+  const { session, setSession } = useLocalSession(token ?? '');
 
-  const { data: event } = useGetEvent(token || "", {
-    query: { enabled: !!token }
+  const { data: event, isLoading: eventLoading } = useGetEvent(token ?? '', {
+    query: { enabled: !!token } as any,
   });
 
-  const { data: balances } = useGetBalances(token || "", {
-    query: { 
-      enabled: !!token,
-      refetchInterval: 5000 
-    }
+  const { data: balancesData } = useGetBalances(token ?? '', {
+    query: { enabled: !!token && !!session } as any,
   });
 
-  const { data: expenses } = useListExpenses(token || "", {
-    query: { enabled: !!token }
+  const { data: expenses = [] } = useListExpenses(token ?? '', {
+    query: { enabled: !!token } as any,
   });
 
-  // Redirect if not logged in
+  const { data: activity = [] } = useListActivity(token ?? '', {
+    query: { enabled: !!token } as any,
+  });
+
   useEffect(() => {
-    if (!session) {
+    if (!session && !eventLoading && event) {
       setLocation(`/e/${token}`);
     }
-  }, [session, token, setLocation]);
+  }, [session, event, eventLoading, token, setLocation]);
 
-  if (!session || !event) return null;
+  if (!session || eventLoading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-background">
+        <p className="text-muted-foreground text-sm animate-pulse">A moment…</p>
+      </div>
+    );
+  }
 
-  const myBalance = balances?.memberBalances.find(b => b.memberId === session.memberId);
-  const netBalance = myBalance?.netBalance || 0;
-
-  const recentExpenses = expenses?.slice(0, 5) || [];
+  const myBalance = balancesData?.memberBalances.find(b => b.memberId === session.memberId);
+  const netBalance = myBalance?.netBalance ?? 0;
+  const recentExpenses = expenses.slice(-5).reverse();
+  const recentActivity = activity.slice(-10).reverse();
 
   return (
-    <div className="min-h-[100dvh] bg-background">
-      <TopNav 
-        title={event.name} 
-        token={token!}
-        rightAction={
-          <button 
-            onClick={() => setLocation(`/e/${token}/settings`)}
-            className="p-2 -mr-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Settings className="h-5 w-5" />
-          </button>
-        }
-      />
+    <div className="min-h-dvh bg-background transition-page">
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
+        <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">EvenSteven</p>
+            <h1 className="font-display text-xl text-foreground truncate">{event?.name ?? '…'}</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href={`/e/${token}/settings`}>
+              <Button size="sm" variant="ghost" className="text-xs">
+                {session.memberName}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
 
-      <main className="px-4 py-6 space-y-8">
-        {/* Balance Card */}
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-6 pb-24">
+        {/* Balance card */}
+        <div className={cn(
+          'rounded-xl border bg-card p-5 space-y-1',
+          netBalance > 0 ? 'border-l-4 border-l-green-600 border-border' :
+          netBalance < 0 ? 'border-l-4 border-l-amber-600 border-border' :
+          'border-border'
+        )}>
+          {netBalance === 0 ? (
+            <>
+              <p className="font-display text-3xl text-foreground">You're even.</p>
+              <p className="text-sm text-muted-foreground">No balance to settle.</p>
+            </>
+          ) : netBalance > 0 ? (
+            <>
+              <p className="font-display text-3xl text-green-700">You're owed {formatCurrency(netBalance)}.</p>
+              <p className="text-sm text-muted-foreground">Others will settle with you.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-display text-3xl text-amber-700">You owe {formatCurrency(Math.abs(netBalance))}.</p>
+              <p className="text-sm text-muted-foreground">
+                <Link href={`/e/${token}/settlements`} className="underline underline-offset-2 hover:text-foreground transition-colors">
+                  See settlement plan →
+                </Link>
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Quick links */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'Expenses', href: `/e/${token}/expenses`, count: expenses.length },
+            { label: 'Settle', href: `/e/${token}/settlements` },
+            { label: 'Members', href: `/e/${token}/members` },
+          ].map(item => (
+            <Link key={item.label} href={item.href}>
+              <button className="w-full rounded-lg border border-border bg-card px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted/40 transition-colors text-center">
+                {item.label}
+                {item.count !== undefined && (
+                  <span className="ml-1.5 text-xs text-muted-foreground">{item.count}</span>
+                )}
+              </button>
+            </Link>
+          ))}
+        </div>
+
+        {/* Recent expenses */}
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Your Status</h2>
-          <Card className="p-6 flex flex-col items-center text-center space-y-2 border-white/5 bg-white/5 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-            
-            {netBalance > 0 && (
-              <>
-                <div className="h-12 w-12 rounded-full bg-success/20 flex items-center justify-center mb-2">
-                  <TrendingUp className="h-6 w-6 text-success" />
-                </div>
-                <p className="text-muted-foreground">You are owed</p>
-                <p className="text-4xl font-bold tracking-tight text-success">{formatCurrency(netBalance)}</p>
-              </>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Recent Expenses
+            </h2>
+            {expenses.length > 5 && (
+              <Link href={`/e/${token}/expenses`}>
+                <span className="text-xs text-accent hover:underline">All {expenses.length}</span>
+              </Link>
             )}
-            
-            {netBalance < 0 && (
-              <>
-                <div className="h-12 w-12 rounded-full bg-destructive/20 flex items-center justify-center mb-2">
-                  <TrendingDown className="h-6 w-6 text-destructive" />
-                </div>
-                <p className="text-muted-foreground">You owe</p>
-                <p className="text-4xl font-bold tracking-tight text-destructive">{formatCurrency(Math.abs(netBalance))}</p>
-              </>
-            )}
+          </div>
 
-            {netBalance === 0 && (
-              <>
-                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mb-2">
-                  <CheckCircle2 className="h-6 w-6 text-primary" />
-                </div>
-                <p className="text-muted-foreground">You are all settled up</p>
-                <p className="text-4xl font-bold tracking-tight">{formatCurrency(0)}</p>
-              </>
-            )}
-
-            <div className="w-full flex justify-between pt-6 mt-4 border-t border-border/50 text-sm">
-              <div className="flex flex-col">
-                <span className="text-muted-foreground">Total Paid</span>
-                <span className="font-medium">{formatCurrency(myBalance?.totalPaid || 0)}</span>
-              </div>
-              <div className="flex flex-col text-right">
-                <span className="text-muted-foreground">Event Total</span>
-                <span className="font-medium">{formatCurrency(balances?.totalExpenses || 0)}</span>
-              </div>
+          {recentExpenses.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-6 text-center space-y-1.5">
+              <p className="font-display text-xl text-foreground">The evening is still financially innocent.</p>
+              <p className="text-xs text-muted-foreground">No expenses have been recorded yet.</p>
             </div>
-          </Card>
+          ) : (
+            <div className="space-y-2">
+              {recentExpenses.map(expense => (
+                <div key={expense.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                  <span className="text-lg w-7 text-center">{CATEGORY_LABELS[expense.category] ?? '📦'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {expense.description ?? expense.category.charAt(0).toUpperCase() + expense.category.slice(1)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Paid by {expense.paidByMemberName}</p>
+                  </div>
+                  <span className="text-sm font-semibold text-foreground tabular-nums">
+                    {formatCurrency(expense.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
-        {/* Recent Activity */}
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Recent Expenses</h2>
-            {recentExpenses.length > 0 && (
-              <button 
-                onClick={() => setLocation(`/e/${token}/expenses`)}
-                className="text-xs text-primary font-medium"
-              >
-                See All
-              </button>
-            )}
-          </div>
+        {/* Timeline */}
+        <section className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Timeline
+          </h2>
 
-          <div className="space-y-2">
-            {recentExpenses.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border border-dashed border-border rounded-xl">
-                No expenses yet. Add one!
-              </div>
-            ) : (
-              recentExpenses.map(exp => (
-                <div key={exp.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center text-secondary-foreground font-semibold">
-                      {exp.category.substring(0,2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium">{exp.description || exp.category}</p>
-                      <p className="text-xs text-muted-foreground">Paid by {exp.paidByName}</p>
+          {recentActivity.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-6 text-center space-y-1.5">
+              <p className="font-display text-xl text-foreground">Quiet so far.</p>
+              <p className="text-xs text-muted-foreground">Activity will appear here as the evening unfolds.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentActivity.map(entry => {
+                const headline = ACTION_HEADLINES[entry.action]?.(entry.metadata ?? {}) ?? entry.action;
+                const caption = ACTION_CAPTIONS[entry.action]?.(entry.metadata ?? {});
+                return (
+                  <div key={entry.id} className="flex gap-3">
+                    <div className="mt-1 w-1.5 h-1.5 rounded-full bg-accent shrink-0 mt-[7px]" />
+                    <div className="flex-1 space-y-0.5">
+                      <p className="text-sm text-foreground leading-snug">{headline}</p>
+                      {caption && <p className="text-xs text-muted-foreground">{caption}</p>}
+                      <p className="text-xs text-muted-foreground/60">{formatDate(entry.createdAt.toString())}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(exp.amount)}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </section>
       </main>
 
-      <div className="fixed bottom-20 right-4 z-50">
-        <Button 
-          size="icon" 
-          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all"
-          onClick={() => setLocation(`/e/${token}/add-expense`)}
-        >
-          <Plus className="h-6 w-6" />
-        </Button>
-      </div>
-
-      <BottomNav token={token!} />
+      {/* FAB */}
+      {!event?.frozen && (
+        <div className="fixed bottom-6 right-6 z-20">
+          <Link href={`/e/${token}/add-expense`}>
+            <button
+              className="h-14 px-5 rounded-full bg-primary text-primary-foreground font-medium text-sm shadow-lg hover:shadow-xl hover:opacity-90 transition-all flex items-center gap-2"
+            >
+              <span className="text-lg leading-none">+</span>
+              Add Expense
+            </button>
+          </Link>
+        </div>
+      )}
     </div>
   );
 }

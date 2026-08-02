@@ -1,137 +1,110 @@
-import { useState } from "react";
-import { useParams } from "wouter";
-import { 
-  useListMembers, 
-  useListFamilies, 
-  useListJoinRequests, 
-  useUpdateJoinRequest,
-  useRemoveMember
-} from "@workspace/api-client-react";
-import { useLocalSession } from "@/hooks/use-local-session";
-import { TopNav, BottomNav } from "@/components/layout/nav";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { UserMinus, Check, X, ShieldAlert } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from 'react';
+import { useLocation, useParams, Link } from 'wouter';
+import { useGetEvent, useListMembers } from '@workspace/api-client-react';
+import { useLocalSession } from '@/hooks/use-local-session';
+import { ArrowLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function MembersPage() {
   const { token } = useParams<{ token: string }>();
-  const { session } = useLocalSession(token || "");
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+  const { session } = useLocalSession(token ?? '');
 
-  const { data: members } = useListMembers(token || "", { query: { enabled: !!token } });
-  const { data: families } = useListFamilies(token || "", { query: { enabled: !!token } });
-  const { data: joinRequests } = useListJoinRequests(token || "", { 
-    query: { enabled: !!token && !!session?.isHost } 
-  });
+  const { data: event } = useGetEvent(token ?? '', { query: { enabled: !!token } as any });
+  const { data: members = [], isLoading } = useListMembers(token ?? '', { query: { enabled: !!token } as any });
 
-  const updateJoinReq = useUpdateJoinRequest();
-  const removeMember = useRemoveMember();
+  useEffect(() => {
+    if (!session) setLocation(`/e/${token}`);
+  }, [session, token, setLocation]);
 
-  const handleApprove = (reqId: number) => {
-    updateJoinReq.mutate({
-      token: token!,
-      requestId: reqId,
-      data: { status: 'approved' }
-    }, {
-      onSuccess: () => {
-        toast({ title: "Member approved" });
-        queryClient.invalidateQueries({ queryKey: ['/api/events', token, 'members'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/events', token, 'join-requests'] });
-      }
-    });
-  };
+  if (!session) return null;
 
-  const handleReject = (reqId: number) => {
-    updateJoinReq.mutate({
-      token: token!,
-      requestId: reqId,
-      data: { status: 'rejected' }
-    }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['/api/events', token, 'join-requests'] });
-      }
-    });
-  };
+  const approved = members.filter(m => m.approved);
 
-  const handleRemoveMember = (memberId: number) => {
-    if (!confirm("Are you sure you want to remove this member?")) return;
-    removeMember.mutate({ token: token!, memberId }, {
-      onSuccess: () => {
-        toast({ title: "Member removed" });
-        queryClient.invalidateQueries({ queryKey: ['/api/events', token, 'members'] });
-      }
-    });
-  };
-
-  const pendingRequests = joinRequests?.filter(r => r.status === 'pending') || [];
+  // Group by house
+  const houseMap = new Map<string, typeof members>();
+  const noHouse: typeof members = [];
+  for (const m of approved) {
+    const key = m.houseName ?? '__none__';
+    if (key === '__none__') { noHouse.push(m); continue; }
+    if (!houseMap.has(key)) houseMap.set(key, []);
+    houseMap.get(key)!.push(m);
+  }
 
   return (
-    <div className="min-h-[100dvh] bg-background">
-      <TopNav title="Members" token={token!} />
-
-      <main className="px-4 py-6 space-y-8">
-        
-        {session?.isHost && pendingRequests.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4" /> Pending Requests
-            </h2>
-            <div className="space-y-2">
-              {pendingRequests.map(req => (
-                <Card key={req.id} className="p-4 flex items-center justify-between border-primary/20 bg-primary/5">
-                  <span className="font-medium">{req.name}</span>
-                  <div className="flex gap-2">
-                    <Button size="icon" variant="ghost" onClick={() => handleReject(req.id)} className="h-8 w-8 text-destructive hover:bg-destructive/10">
-                      <X className="h-4 w-4" />
-                    </Button>
-                    <Button size="icon" onClick={() => handleApprove(req.id)} className="h-8 w-8 bg-success hover:bg-success/90">
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">All Members</h2>
+    <div className="min-h-dvh bg-background transition-page">
+      <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
+        <div className="max-w-lg mx-auto flex items-center gap-3">
+          <Link href={`/e/${token}/dashboard`}>
+            <button className="p-1 rounded-md hover:bg-muted/40 transition-colors text-muted-foreground">
+              <ArrowLeft size={18} />
+            </button>
+          </Link>
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">{event?.name}</p>
+            <h1 className="font-display text-xl text-foreground">
+              Members <span className="text-muted-foreground font-normal text-base">({approved.length})</span>
+            </h1>
           </div>
-          <div className="grid grid-cols-1 gap-2">
-            {members?.map(m => (
-              <div key={m.id} className="flex items-center justify-between p-4 rounded-xl border border-border/50 bg-card">
-                <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-full bg-secondary flex items-center justify-center font-medium">
-                    {m.name.substring(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="font-medium flex items-center gap-2">
-                      {m.name}
-                      {m.isHost && <span className="text-[10px] uppercase bg-primary/20 text-primary px-2 py-0.5 rounded-full">Host</span>}
-                    </p>
-                    {m.familyName && <p className="text-xs text-muted-foreground">{m.familyName}</p>}
-                  </div>
+        </div>
+      </header>
+
+      <main className="max-w-lg mx-auto px-4 py-6 space-y-5">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground text-center py-8 animate-pulse">Loading…</p>
+        ) : (
+          <>
+            {Array.from(houseMap.entries()).map(([houseName, hMembers]) => {
+              const firstMember = hMembers[0];
+              const accentColor = firstMember?.houseAccentColor ?? undefined;
+              return (
+                <div key={houseName} className="space-y-1.5">
+                  <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground px-1">
+                    {houseName}
+                  </p>
+                  {hMembers.map(m => (
+                    <div
+                      key={m.id}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5',
+                        m.id === session?.memberId && 'ring-1 ring-accent'
+                      )}
+                    >
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+                        style={{ backgroundColor: accentColor ?? 'hsl(var(--primary))' }}
+                      >
+                        {m.name[0].toUpperCase()}
+                      </div>
+                      <span className="flex-1 text-sm font-medium text-foreground">{m.name}</span>
+                      <div className="flex gap-1.5 items-center">
+                        {m.isHost && (
+                          <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">host</span>
+                        )}
+                        {m.id === session?.memberId && (
+                          <span className="text-xs text-accent font-medium">you</span>
+                        )}
+                        {!m.claimed && (
+                          <span className="text-xs text-muted-foreground">not joined</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                {session?.isHost && !m.isHost && (
-                  <button 
-                    onClick={() => handleRemoveMember(m.id)}
-                    className="p-2 text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <UserMinus className="h-4 w-4" />
-                  </button>
-                )}
+              );
+            })}
+            {noHouse.map(m => (
+              <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                  {m.name[0].toUpperCase()}
+                </div>
+                <span className="flex-1 text-sm font-medium text-foreground">{m.name}</span>
+                {m.isHost && <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">host</span>}
               </div>
             ))}
-          </div>
-        </section>
-
+          </>
+        )}
       </main>
-
-      <BottomNav token={token!} />
     </div>
   );
 }

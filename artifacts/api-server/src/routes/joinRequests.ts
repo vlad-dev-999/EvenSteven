@@ -141,7 +141,7 @@ router.patch("/events/:token/join-requests/:requestId", async (req, res): Promis
     await db.insert(membersTable).values({
       eventId: event.id,
       name: joinRequest.name,
-      familyId: parsed.data.familyId ?? null,
+      familyId: null,
       isHost: false,
       approvedAt: new Date(),
     });

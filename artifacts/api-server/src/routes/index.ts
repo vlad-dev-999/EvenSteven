@@ -1,5 +1,8 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import hostRouter from "./host";
+import housesRouter from "./houses";
+import peopleRouter from "./people";
 import eventsRouter from "./events";
 import membersRouter from "./members";
 import familiesRouter from "./families";
@@ -10,6 +13,9 @@ import settlementsRouter from "./settlements";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(hostRouter);
+router.use(housesRouter);
+router.use(peopleRouter);
 router.use(eventsRouter);
 router.use(membersRouter);
 router.use(familiesRouter);

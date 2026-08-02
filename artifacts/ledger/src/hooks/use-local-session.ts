@@ -4,15 +4,19 @@ export interface SessionContext {
   memberId: number;
   memberName: string;
   isHost: boolean;
+  personalPin?: string;
 }
 
 export function useLocalSession(token: string) {
-  const key = `ledger_member_${token}`;
-  
+  const key = `evensteven_member_${token}`;
+
   const [session, setSessionState] = useState<SessionContext | null>(() => {
     try {
       const item = localStorage.getItem(key);
-      return item ? JSON.parse(item) : null;
+      if (item) return JSON.parse(item);
+      // Backwards compat: try old key
+      const oldItem = localStorage.getItem(`ledger_member_${token}`);
+      return oldItem ? JSON.parse(oldItem) : null;
     } catch {
       return null;
     }
@@ -25,11 +29,12 @@ export function useLocalSession(token: string) {
         localStorage.setItem(key, JSON.stringify(newSession));
       } else {
         localStorage.removeItem(key);
+        localStorage.removeItem(`ledger_member_${token}`);
       }
-    } catch (err) {
-      console.error('Failed to save session to localStorage', err);
+    } catch {
+      // ignore
     }
-  }, [key]);
+  }, [key, token]);
 
   return { session, setSession };
 }

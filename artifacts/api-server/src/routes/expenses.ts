@@ -180,8 +180,8 @@ router.post("/events/:token/expenses", async (req, res): Promise<void> => {
     event.id,
     amount,
     splitType as "everyone" | "families" | "members",
-    participantIds,
-    familyIds,
+    participantIds ?? undefined,
+    familyIds ?? undefined,
   );
 
   if (participants.length > 0) {
@@ -258,8 +258,8 @@ router.patch("/events/:token/expenses/:expenseId", async (req, res): Promise<voi
       event.id,
       newAmount,
       newSplitType,
-      parsed.data.participantIds,
-      parsed.data.familyIds,
+      parsed.data.participantIds ?? undefined,
+      parsed.data.familyIds ?? undefined,
     );
     if (participants.length > 0) {
       await db.insert(expenseParticipantsTable).values(
