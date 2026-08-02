@@ -262,6 +262,16 @@ export default function LoginPage() {
         )}
       </div>
 
+      {/* Skipper footer — administrator entry */}
+      <div className="fixed bottom-4 right-5 select-none">
+        <button
+          onClick={() => setLocation('/host')}
+          className="text-[11px] text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors cursor-pointer"
+        >
+          🐧 Skipper
+        </button>
+      </div>
+
       {/* PIN dialog */}
       <Dialog open={showPinDialog} onOpenChange={open => { if (!verifying) setShowPinDialog(open); }}>
         <DialogContent className="max-w-sm">
