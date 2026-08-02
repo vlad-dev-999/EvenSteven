@@ -3,20 +3,34 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Ledger - Collaborative expense settlement API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: events
+    description: Event management
+  - name: members
+    description: Member management
+  - name: families
+    description: Family group management
+  - name: expenses
+    description: Expense management
+  - name: join-requests
+    description: Join request management
+  - name: settlements
+    description: Balance and settlement calculations
+  - name: activity
+    description: Activity log
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +38,480 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /events:
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create a new event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventInput"
+      responses:
+        "201":
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventCreated"
+
+  /events/{token}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event details
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+        "404":
+          description: Event not found
+
+  /events/{token}/session:
+    post:
+      operationId: setSession
+      tags: [events]
+      summary: Set current member session (authenticate as a member)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "200":
+          description: Session set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Invalid PIN or member not found
+    get:
+      operationId: getSession
+      tags: [events]
+      summary: Get current member session
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResult"
+
+  /events/{token}/freeze:
+    post:
+      operationId: freezeEvent
+      tags: [events]
+      summary: Freeze event (host only)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event frozen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{token}/unfreeze:
+    post:
+      operationId: unfreezeEvent
+      tags: [events]
+      summary: Unfreeze event (host only)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event unfrozen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{token}/members:
+    get:
+      operationId: listMembers
+      tags: [members]
+      summary: List all members of an event
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Members list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Member"
+
+  /events/{token}/members/{memberId}:
+    delete:
+      operationId: removeMember
+      tags: [members]
+      summary: Remove a member (host only)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Member removed
+
+  /events/{token}/families:
+    get:
+      operationId: listFamilies
+      tags: [families]
+      summary: List families for an event
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Families list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Family"
+    post:
+      operationId: createFamily
+      tags: [families]
+      summary: Create a family group
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FamilyInput"
+      responses:
+        "201":
+          description: Family created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Family"
+
+  /events/{token}/families/{familyId}:
+    delete:
+      operationId: deleteFamily
+      tags: [families]
+      summary: Delete a family group
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: familyId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Family deleted
+
+  /events/{token}/join-requests:
+    get:
+      operationId: listJoinRequests
+      tags: [join-requests]
+      summary: List pending join requests (host only)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Join requests list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JoinRequest"
+    post:
+      operationId: createJoinRequest
+      tags: [join-requests]
+      summary: Submit a join request or rejoin as existing member
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRequestInput"
+      responses:
+        "201":
+          description: Join request submitted or member matched
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinResult"
+
+  /events/{token}/join-requests/{requestId}:
+    patch:
+      operationId: updateJoinRequest
+      tags: [join-requests]
+      summary: Approve or reject a join request (host only)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: requestId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRequestUpdate"
+      responses:
+        "200":
+          description: Join request updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinRequest"
+
+  /events/{token}/expenses:
+    get:
+      operationId: listExpenses
+      tags: [expenses]
+      summary: List all expenses for an event
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Expenses list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Expense"
+    post:
+      operationId: createExpense
+      tags: [expenses]
+      summary: Add a new expense
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseInput"
+      responses:
+        "201":
+          description: Expense created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+
+  /events/{token}/expenses/{expenseId}:
+    patch:
+      operationId: updateExpense
+      tags: [expenses]
+      summary: Edit an expense
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExpenseUpdate"
+      responses:
+        "200":
+          description: Expense updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Expense"
+    delete:
+      operationId: deleteExpense
+      tags: [expenses]
+      summary: Delete an expense (host or expense owner)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: expenseId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Expense deleted
+
+  /events/{token}/balances:
+    get:
+      operationId: getBalances
+      tags: [settlements]
+      summary: Get current balances for all members
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Current balances
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BalanceSummary"
+
+  /events/{token}/settlements:
+    get:
+      operationId: getSettlements
+      tags: [settlements]
+      summary: Get minimum transfer settlement plan
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Settlement plan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Settlement"
+
+  /events/{token}/activity:
+    get:
+      operationId: listActivity
+      tags: [activity]
+      summary: Get activity log for an event
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Activity log
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityEntry"
+
+  /events/{token}/summary:
+    get:
+      operationId: getEventSummary
+      tags: [events]
+      summary: Get event summary stats
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventSummary"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +522,483 @@ components:
       required:
         - status
 
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        token:
+          type: string
+        frozen:
+          type: boolean
+        memberCount:
+          type: integer
+        totalExpenses:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - token
+        - frozen
+        - memberCount
+        - totalExpenses
+        - createdAt
+
+    EventInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        hostName:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - name
+        - hostName
+
+    EventCreated:
+      type: object
+      properties:
+        event:
+          $ref: "#/components/schemas/Event"
+        pin:
+          type: string
+          description: 4-digit PIN for the host
+        hostMember:
+          $ref: "#/components/schemas/Member"
+      required:
+        - event
+        - pin
+        - hostMember
+
+    Member:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        name:
+          type: string
+        familyId:
+          type: ["integer", "null"]
+        familyName:
+          type: ["string", "null"]
+        isHost:
+          type: boolean
+        approved:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - eventId
+        - name
+        - familyId
+        - familyName
+        - isHost
+        - approved
+        - createdAt
+
+    Family:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        name:
+          type: string
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - eventId
+        - name
+        - memberCount
+        - createdAt
+
+    FamilyInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - name
+
+    SessionInput:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        pin:
+          type: string
+      required:
+        - memberId
+        - pin
+
+    SessionResult:
+      type: object
+      properties:
+        member:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            isHost:
+              type: boolean
+          required:
+            - id
+            - name
+            - isHost
+        authenticated:
+          type: boolean
+      required:
+        - member
+        - authenticated
+
+    JoinRequest:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        name:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - eventId
+        - name
+        - status
+        - createdAt
+
+    JoinRequestInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+      required:
+        - name
+
+    JoinRequestUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [approved, rejected]
+        familyId:
+          type: ["integer", "null"]
+      required:
+        - status
+
+    JoinResult:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [existing_member, join_request_created]
+        member:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            isHost:
+              type: boolean
+          required:
+            - id
+            - name
+            - isHost
+        joinRequest:
+          type: ["object", "null"]
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            status:
+              type: string
+          required:
+            - id
+            - name
+            - status
+      required:
+        - type
+
+    Expense:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        paidByMemberId:
+          type: integer
+        paidByName:
+          type: string
+        category:
+          type: string
+          enum: [tickets, food, drinks, snacks, fuel, other]
+        amount:
+          type: integer
+          description: Amount in smallest currency unit (e.g. paise/cents)
+        description:
+          type: ["string", "null"]
+        splitType:
+          type: string
+          enum: [everyone, families, members]
+        participantIds:
+          type: array
+          items:
+            type: integer
+        participants:
+          type: array
+          items:
+            type: object
+            properties:
+              memberId:
+                type: integer
+              memberName:
+                type: string
+              shareAmount:
+                type: integer
+            required:
+              - memberId
+              - memberName
+              - shareAmount
+        createdByMemberId:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - eventId
+        - paidByMemberId
+        - paidByName
+        - category
+        - amount
+        - description
+        - splitType
+        - participantIds
+        - participants
+        - createdByMemberId
+        - createdAt
+        - updatedAt
+
+    ExpenseInput:
+      type: object
+      properties:
+        paidByMemberId:
+          type: integer
+        category:
+          type: string
+          enum: [tickets, food, drinks, snacks, fuel, other]
+        amount:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        splitType:
+          type: string
+          enum: [everyone, families, members]
+        participantIds:
+          type: array
+          items:
+            type: integer
+          description: Required when splitType is families or members
+        familyIds:
+          type: array
+          items:
+            type: integer
+          description: Required when splitType is families
+      required:
+        - paidByMemberId
+        - category
+        - amount
+        - splitType
+
+    ExpenseUpdate:
+      type: object
+      properties:
+        paidByMemberId:
+          type: integer
+        category:
+          type: string
+          enum: [tickets, food, drinks, snacks, fuel, other]
+        amount:
+          type: integer
+          minimum: 1
+        description:
+          type: string
+        splitType:
+          type: string
+          enum: [everyone, families, members]
+        participantIds:
+          type: array
+          items:
+            type: integer
+        familyIds:
+          type: array
+          items:
+            type: integer
+
+    MemberBalance:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        memberName:
+          type: string
+        totalPaid:
+          type: integer
+        totalOwed:
+          type: integer
+        netBalance:
+          type: integer
+          description: Positive = credit, negative = debit
+      required:
+        - memberId
+        - memberName
+        - totalPaid
+        - totalOwed
+        - netBalance
+
+    BalanceSummary:
+      type: object
+      properties:
+        totalExpenses:
+          type: integer
+        expenseCount:
+          type: integer
+        memberBalances:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberBalance"
+      required:
+        - totalExpenses
+        - expenseCount
+        - memberBalances
+
+    Settlement:
+      type: object
+      properties:
+        fromMemberId:
+          type: integer
+        fromMemberName:
+          type: string
+        toMemberId:
+          type: integer
+        toMemberName:
+          type: string
+        amount:
+          type: integer
+      required:
+        - fromMemberId
+        - fromMemberName
+        - toMemberId
+        - toMemberName
+        - amount
+
+    ActivityEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        memberName:
+          type: ["string", "null"]
+        action:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - eventId
+        - memberName
+        - action
+        - metadata
+        - createdAt
+
+    EventSummary:
+      type: object
+      properties:
+        totalExpenses:
+          type: integer
+        expenseCount:
+          type: integer
+        memberCount:
+          type: integer
+        familyCount:
+          type: integer
+        categoryBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              total:
+                type: integer
+              count:
+                type: integer
+            required:
+              - category
+              - total
+              - count
+        topPayers:
+          type: array
+          items:
+            type: object
+            properties:
+              memberId:
+                type: integer
+              memberName:
+                type: string
+              totalPaid:
+                type: integer
+            required:
+              - memberId
+              - memberName
+              - totalPaid
+      required:
+        - totalExpenses
+        - expenseCount
+        - memberCount
+        - familyCount
+        - categoryBreakdown
+        - topPayers
