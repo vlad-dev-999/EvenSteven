@@ -251,11 +251,14 @@ router.get("/events/:token", async (req, res): Promise<void> => {
     .from(expensesTable)
     .where(eq(expensesTable.eventId, event.id));
 
+  const hostName = await getHostMemberName(event.id);
+
   res.json(
     formatEvent(
       event,
       Number(memberCountResult?.count ?? 0),
       Number(expenseSumResult?.total ?? 0),
+      hostName,
     ),
   );
 });
@@ -325,6 +328,66 @@ router.patch("/events/:token", requireHost, async (req, res): Promise<void> => {
     Number(memberCountResult?.count ?? 0),
     Number(expenseSumResult?.total ?? 0),
   ));
+});
+
+/** POST /events/:token/freeze — freeze an event (host only) */
+router.post("/events/:token/freeze", requireHost, async (req, res): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
+  if (!event) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(eventsTable)
+    .set({ frozen: true })
+    .where(eq(eventsTable.token, token))
+    .returning();
+
+  const [memberCountResult] = await db
+    .select({ count: count() })
+    .from(membersTable)
+    .where(eq(membersTable.eventId, updated.id));
+
+  const [expenseSumResult] = await db
+    .select({ total: sum(expensesTable.amount) })
+    .from(expensesTable)
+    .where(eq(expensesTable.eventId, updated.id));
+
+  const hostName = await getHostMemberName(updated.id);
+  res.json(formatEvent(updated, Number(memberCountResult?.count ?? 0), Number(expenseSumResult?.total ?? 0), hostName));
+});
+
+/** POST /events/:token/unfreeze — unfreeze an event (host only) */
+router.post("/events/:token/unfreeze", requireHost, async (req, res): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
+  if (!event) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  const [updated] = await db
+    .update(eventsTable)
+    .set({ frozen: false })
+    .where(eq(eventsTable.token, token))
+    .returning();
+
+  const [memberCountResult] = await db
+    .select({ count: count() })
+    .from(membersTable)
+    .where(eq(membersTable.eventId, updated.id));
+
+  const [expenseSumResult] = await db
+    .select({ total: sum(expensesTable.amount) })
+    .from(expensesTable)
+    .where(eq(expensesTable.eventId, updated.id));
+
+  const hostName = await getHostMemberName(updated.id);
+  res.json(formatEvent(updated, Number(memberCountResult?.count ?? 0), Number(expenseSumResult?.total ?? 0), hostName));
 });
 
 /**

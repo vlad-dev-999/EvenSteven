@@ -136,9 +136,11 @@ router.post("/people/:id/pin", requireHost, async (req, res): Promise<void> => {
   const pin = generatePin();
   const pinHash = hashPin(pin);
 
+  // Setting a PIN via admin also marks the person as activated (admin vouches for identity).
+  // This allows admin-assigned PINs to work for login without requiring the email OTP flow.
   await db
     .update(peopleTable)
-    .set({ personalPinHash: pinHash })
+    .set({ personalPinHash: pinHash, activated: true })
     .where(eq(peopleTable.id, id));
 
   // Return plaintext once — host must share it with the person
