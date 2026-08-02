@@ -35,6 +35,7 @@ export default function ExpensesPage() {
         queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/expenses`] });
         queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/balances`] });
         queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/activity`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/settlements`] });
         toast.success('Expense removed.');
       },
       onError: () => toast.error('Could not remove expense.'),

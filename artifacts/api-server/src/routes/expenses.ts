@@ -8,6 +8,15 @@ import {
   membersTable,
   familiesTable,
 } from "@workspace/db";
+
+/** Upgrade the event's settlementMode to 'house' when a families-split expense exists. */
+async function maybeUpgradeSettlementMode(eventId: number, splitType: string) {
+  if (splitType !== "families") return;
+  await db
+    .update(eventsTable)
+    .set({ settlementMode: "house" })
+    .where(and(eq(eventsTable.id, eventId), eq(eventsTable.settlementMode, "individual")));
+}
 import {
   CreateExpenseBody,
   CreateExpenseResponse,
@@ -95,7 +104,7 @@ async function buildExpenseResponse(expenseId: number, eventId: number) {
     id: expense.id,
     eventId: expense.eventId,
     paidByMemberId: expense.paidByMemberId,
-    paidByName: paidByMember?.name ?? "Unknown",
+    paidByMemberName: paidByMember?.name ?? "Unknown",
     category: expense.category,
     amount: expense.amount,
     description: expense.description ?? null,
@@ -203,6 +212,9 @@ router.post("/events/:token/expenses", async (req, res): Promise<void> => {
     paidByMember?.name,
   );
 
+  // Auto-upgrade event settlementMode to 'house' when any expense uses families split
+  await maybeUpgradeSettlementMode(event.id, splitType);
+
   const result = await buildExpenseResponse(expense.id, event.id);
   res.status(201).json(CreateExpenseResponse.parse(result));
 });
@@ -284,6 +296,10 @@ router.patch("/events/:token/expenses/:expenseId", async (req, res): Promise<voi
     existing.createdByMemberId,
     updaterMember?.name,
   );
+
+  // Auto-upgrade event settlementMode to 'house' when any expense uses families split
+  const effectiveSplitType = parsed.data.splitType ?? existing.splitType;
+  await maybeUpgradeSettlementMode(event.id, effectiveSplitType);
 
   const result = await buildExpenseResponse(expenseId, event.id);
   res.json(UpdateExpenseResponse.parse(result));

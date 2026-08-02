@@ -40,13 +40,13 @@ waitForPort = 8080
 name = "Ledger"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "pnpm --filter @workspace/ledger run dev"
-waitForPort = 21356
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=21356 BASE_PATH=/ pnpm --filter @workspace/ledger run dev"
+waitForPort = 21356
 
 [agent]
 stack = "PNPM_WORKSPACE"

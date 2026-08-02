@@ -75,6 +75,7 @@ export default function AddExpensePage() {
         queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/expenses`] });
         queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/balances`] });
         queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/activity`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/events/${token}/settlements`] });
         toast.success('Expense added.');
         setLocation(`/e/${token}/dashboard`);
       },
