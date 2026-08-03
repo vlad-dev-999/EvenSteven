@@ -146,7 +146,7 @@ router.post("/events", async (req, res): Promise<void> => {
     .values({ name: name.trim(), token, pin })
     .returning();
 
-  // Create host member
+  // Create host member — approved and claimed so they appear as Joined immediately
   await db.insert(membersTable).values({
     eventId: event.id,
     name: hostPerson.name,
@@ -154,6 +154,7 @@ router.post("/events", async (req, res): Promise<void> => {
     houseId: hostPerson.houseId,
     isHost: true,
     approvedAt: new Date(),
+    claimedAt: new Date(),
   });
 
   // Seed additional attendees from directory (excluding host who's already added)
@@ -183,7 +184,7 @@ router.post("/events", async (req, res): Promise<void> => {
     }
   }
 
-  await logActivity(event.id, "event_created", { name: event.name });
+  await logActivity(event.id, "event_created", { eventName: event.name });
 
   res.status(201).json({
     event: formatEvent(event, 1 + additionalIds.length, 0),
