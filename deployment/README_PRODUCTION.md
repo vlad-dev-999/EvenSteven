@@ -43,6 +43,9 @@ All configuration comes from environment variables. No `.env` file is committed.
 | `SESSION_SECRET` | ✅ | Used with `HOST_PASSWORD` to derive the host token via HMAC-SHA256. |
 | `NODE_ENV` | ✅ | Set to `production`. Controls logging format and enables static file serving. |
 | `PORT` | ✅ (auto) | TCP port to listen on. Injected automatically by Render. |
+| `BREVO_API_KEY` | ✅ | Brevo transactional email API key. Used to send activation OTP emails over HTTPS. Obtain from Brevo → Settings → API Keys. |
+| `BREVO_SENDER_EMAIL` | ✅ | Verified sender address configured in your Brevo account. |
+| `BREVO_SENDER_NAME` | optional | Display name in the From field. Default: `EvenSteven`. |
 | `LOG_LEVEL` | optional | pino log level. Default: `info`. |
 | `STATIC_DIR` | optional | Absolute path to the compiled frontend (`artifacts/ledger/dist/public`). Override if your layout differs. |
 | `BASE_PATH` | build-time | Vite `base` for the frontend. Set to `/` for root-mounted deployments. |

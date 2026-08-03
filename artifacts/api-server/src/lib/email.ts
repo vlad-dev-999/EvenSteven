@@ -1,11 +1,13 @@
 /**
  * Email utility.
  *
- * If SMTP_HOST is configured, sends real email via nodemailer.
- * In development (NODE_ENV !== 'production') without SMTP, the OTP is logged
- * to the server console and returned as `devOtp` in the API response so the
- * flow can be tested without a mail server.
+ * Sends transactional email via the Brevo REST API (HTTPS, no SMTP).
+ * In development without BREVO_API_KEY, the OTP is logged to the server
+ * console and returned as `devOtp` in the API response so the flow can be
+ * tested without a mail account.
  */
+
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 interface SendOtpOptions {
   to: string;
@@ -15,77 +17,74 @@ interface SendOtpOptions {
 
 interface SendOtpResult {
   sent: boolean;
-  devOtp?: string; // only present in dev when SMTP is not configured
+  devOtp?: string; // only present in dev when BREVO_API_KEY is not configured
 }
 
 export async function sendActivationOtp({ to, name, otp }: SendOtpOptions): Promise<SendOtpResult> {
-  const host = process.env.SMTP_HOST;
+  const apiKey = process.env.BREVO_API_KEY;
 
-  if (!host) {
+  if (!apiKey) {
     // Development fallback — log and return OTP in response
     console.info(`[email] OTP for ${name} <${to}>: ${otp}`);
     if (process.env.NODE_ENV === "production") {
-      // In production without SMTP this is a misconfiguration — fail loudly
-      throw new Error("SMTP_HOST is not configured. Cannot send activation email.");
+      // In production without the API key this is a misconfiguration — fail loudly
+      throw new Error("BREVO_API_KEY is not configured. Cannot send activation email.");
     }
     return { sent: false, devOtp: otp };
   }
 
-  // Lazy import so nodemailer is only loaded when needed
-  const nodemailer = await import("nodemailer");
-  const dns = await import("dns/promises");
+  const senderEmail = process.env.BREVO_SENDER_EMAIL;
+  if (!senderEmail) {
+    throw new Error("BREVO_SENDER_EMAIL is not configured. Cannot send activation email.");
+  }
 
-  const [ipv4, ipv6] = await Promise.all([
-    dns.resolve4(host),
-    dns.resolve6(host).catch(() => [] as string[]),
-  ]);
-  console.info("[email] DNS resolve4", host, ipv4);
-  console.info("[email] DNS resolve6", host, ipv6);
+  const senderName = process.env.BREVO_SENDER_NAME ?? "EvenSteven";
 
-  console.info("[email] Creating SMTP transport");
-  const transporter = nodemailer.default.createTransport({
-    host,
-    port: parseInt(process.env.SMTP_PORT ?? "587", 10),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: process.env.SMTP_USER
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-      : undefined,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 10_000,
-    family: 4,
-  });
+  const payload = {
+    sender: { name: senderName, email: senderEmail },
+    to: [{ email: to, name }],
+    subject: "Your EvenSteven activation code",
+    textContent: [
+      `Hi ${name},`,
+      ``,
+      `Your one-time activation code is:`,
+      ``,
+      `  ${otp}`,
+      ``,
+      `It expires in 15 minutes. Enter it to activate your account and choose a PIN.`,
+      ``,
+      `If you didn't request this, you can safely ignore this email.`,
+    ].join("\n"),
+    htmlContent: `
+      <p>Hi ${name},</p>
+      <p>Your one-time activation code is:</p>
+      <p style="font-size:2em;letter-spacing:0.3em;font-weight:bold">${otp}</p>
+      <p>It expires in 15 minutes. Enter it to activate your account and choose a PIN.</p>
+      <p style="color:#666;font-size:0.9em">If you didn't request this, you can safely ignore this email.</p>
+    `,
+  };
 
-  const from = process.env.SMTP_FROM ?? `"EvenSteven" <noreply@${host}>`;
-
-  console.info("[email] Sending email");
+  console.info("[email] Sending email via Brevo API");
+  let response: Response;
   try {
-    await transporter.sendMail({
-      from,
-      to: `"${name}" <${to}>`,
-      subject: "Your EvenSteven activation code",
-      text: [
-        `Hi ${name},`,
-        ``,
-        `Your one-time activation code is:`,
-        ``,
-        `  ${otp}`,
-        ``,
-        `It expires in 15 minutes. Enter it to activate your account and choose a PIN.`,
-        ``,
-        `If you didn't request this, you can safely ignore this email.`,
-      ].join("\n"),
-      html: `
-        <p>Hi ${name},</p>
-        <p>Your one-time activation code is:</p>
-        <p style="font-size:2em;letter-spacing:0.3em;font-weight:bold">${otp}</p>
-        <p>It expires in 15 minutes. Enter it to activate your account and choose a PIN.</p>
-        <p style="color:#666;font-size:0.9em">If you didn't request this, you can safely ignore this email.</p>
-      `,
+    response = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
     });
   } catch (err) {
-    console.error("[email] sendMail failed", err);
+    console.error("[email] Brevo API request failed", err);
     throw err;
+  }
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "(no body)");
+    console.error("[email] Brevo API error", response.status, body);
+    throw new Error(`Brevo API returned ${response.status}`);
   }
 
   return { sent: true };
