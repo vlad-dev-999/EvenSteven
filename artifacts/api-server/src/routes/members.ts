@@ -86,6 +86,11 @@ router.post("/events/:token/members", requireHost, async (req, res): Promise<voi
     return;
   }
 
+  if (event.frozen) {
+    res.status(403).json({ error: "Event is frozen. Attendee changes are not allowed." });
+    return;
+  }
+
   const [person] = await db.select().from(peopleTable).where(eq(peopleTable.id, personId));
   if (!person || !person.active) {
     res.status(404).json({ error: "Person not found or inactive" });
@@ -172,6 +177,11 @@ router.delete("/events/:token/members/:memberId", async (req, res): Promise<void
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  if (event.frozen) {
+    res.status(403).json({ error: "Event is frozen. Attendee changes are not allowed." });
     return;
   }
 

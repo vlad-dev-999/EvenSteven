@@ -12,6 +12,7 @@ import {
 import { generateToken, generatePin } from "../lib/token";
 import { logActivity } from "../lib/activity";
 import { requireHost } from "../lib/host-auth";
+
 import { pinVerifyLimiter } from "../lib/rate-limiters";
 import { verifyPin } from "../lib/pin-hash";
 
@@ -357,6 +358,7 @@ router.post("/events/:token/freeze", requireHost, async (req, res): Promise<void
     .from(expensesTable)
     .where(eq(expensesTable.eventId, updated.id));
 
+  await logActivity(updated.id, "event_frozen", {});
   const hostName = await getHostMemberName(updated.id);
   res.json(formatEvent(updated, Number(memberCountResult?.count ?? 0), Number(expenseSumResult?.total ?? 0), hostName));
 });
@@ -387,6 +389,7 @@ router.post("/events/:token/unfreeze", requireHost, async (req, res): Promise<vo
     .from(expensesTable)
     .where(eq(expensesTable.eventId, updated.id));
 
+  await logActivity(updated.id, "event_unfrozen", {});
   const hostName = await getHostMemberName(updated.id);
   res.json(formatEvent(updated, Number(memberCountResult?.count ?? 0), Number(expenseSumResult?.total ?? 0), hostName));
 });

@@ -63,6 +63,11 @@ router.post("/events/:token/families", async (req, res): Promise<void> => {
     return;
   }
 
+  if (event.frozen) {
+    res.status(403).json({ error: "Event is frozen. Family changes are not allowed." });
+    return;
+  }
+
   const parsed = CreateFamilyBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -96,6 +101,11 @@ router.delete("/events/:token/families/:familyId", async (req, res): Promise<voi
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  if (event.frozen) {
+    res.status(403).json({ error: "Event is frozen. Family changes are not allowed." });
     return;
   }
 

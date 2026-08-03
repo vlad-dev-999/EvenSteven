@@ -359,6 +359,16 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-lg mx-auto px-4 py-6 space-y-6 pb-24">
+        {/* Frozen banner */}
+        {ev?.frozen && (
+          <div className="rounded-xl border border-border bg-muted/40 px-5 py-4 text-center space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Event Closed</p>
+            <p className="font-display text-lg text-foreground leading-snug">
+              This evening now exists only in priceless memories and echoes of past laughter.
+            </p>
+          </div>
+        )}
+
         {/* Banner hero — shown when bannerImage is set */}
         {hasBanner && <EventBanner event={ev} />}
 

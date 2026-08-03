@@ -19,6 +19,8 @@ import {
   useGetEventSummary,
   useAddAttendee,
   useRemoveMember,
+  useFreezeEvent,
+  useUnfreezeEvent,
 } from '@workspace/api-client-react';
 import type { House, Person } from '@workspace/api-client-react';
 import { useHostSession } from '@/hooks/use-host-session';
@@ -689,6 +691,8 @@ function EventsTab({ hostToken }: { hostToken: string }) {
   const { data: events = [], isLoading } = useListEvents({ request: { headers: hostHeaders } });
   const { data: people = [] } = useListPeople();
   const createMutation = useCreateEvent({ request: { headers: hostHeaders } });
+  const freezeMutation = useFreezeEvent({ request: { headers: hostHeaders } });
+  const unfreezeMutation = useUnfreezeEvent({ request: { headers: hostHeaders } });
 
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
@@ -697,6 +701,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
   const [createdEvent, setCreatedEvent] = useState<{ token: string; name: string; pin: string } | null>(null);
   const [archiving, setArchiving] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [toggling, setToggling] = useState<string | null>(null);
 
   const [form, setForm] = useState({ name: '', hostPersonId: 0, attendeePersonIds: [] as number[] });
   const activePeople = people.filter(p => p.active);
@@ -725,6 +730,32 @@ function EventsTab({ hostToken }: { hostToken: string }) {
       },
       onError: () => toast.error('Could not create event. Please try again.'),
     });
+  };
+
+  const handleToggleFreeze = (ev: any) => {
+    if (ev.frozen) {
+      if (!confirm(`Reopen "${ev.name}"? Expenses and attendee changes will be allowed again.`)) return;
+      setToggling(ev.token);
+      unfreezeMutation.mutate({ token: ev.token }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+          toast.success(`"${ev.name}" reopened.`);
+        },
+        onError: () => toast.error('Could not reopen event.'),
+        onSettled: () => setToggling(null),
+      });
+    } else {
+      if (!confirm(`Close "${ev.name}"? No new expenses or attendee changes will be allowed.`)) return;
+      setToggling(ev.token);
+      freezeMutation.mutate({ token: ev.token }, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+          toast.success(`"${ev.name}" closed.`);
+        },
+        onError: () => toast.error('Could not close event.'),
+        onSettled: () => setToggling(null),
+      });
+    }
   };
 
   const handleArchive = async (ev: any) => {
@@ -804,6 +835,15 @@ function EventsTab({ hostToken }: { hostToken: string }) {
                         {showOverviewToken === ev.token ? 'Close' : 'Overview'}
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setLocation(`/e/${ev.token}/dashboard`)}>Open</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={ev.frozen ? 'text-green-700 hover:text-green-700' : 'text-muted-foreground'}
+                        onClick={() => handleToggleFreeze(ev)}
+                        disabled={toggling === ev.token}
+                      >
+                        {toggling === ev.token ? '…' : ev.frozen ? 'Unfreeze' : 'Freeze'}
+                      </Button>
                       <Button
                         size="sm" variant="ghost"
                         className="text-muted-foreground"
