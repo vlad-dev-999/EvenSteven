@@ -56,15 +56,6 @@ export async function sendActivationOtp({ to, name, otp }: SendOtpOptions): Prom
     family: 4,
   });
 
-  console.info("[email] Verifying SMTP");
-  try {
-    await transporter.verify();
-  } catch (err) {
-    console.error("[email] SMTP verification failed — resolved IPv4", ipv4, "socket error", err);
-    throw Object.assign(new Error("SMTP verification failed"), { smtpVerifyFailed: true });
-  }
-  console.info("[email] SMTP verified");
-
   const from = process.env.SMTP_FROM ?? `"EvenSteven" <noreply@${host}>`;
 
   console.info("[email] Sending email");
