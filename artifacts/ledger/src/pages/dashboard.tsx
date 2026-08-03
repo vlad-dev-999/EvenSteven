@@ -11,7 +11,7 @@ import { useLocalSession } from '@/hooks/use-local-session';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
-import { Share2, Link2, MapPin, FileText, BarChart2, QrCode } from 'lucide-react';
+import { Share2, Link2, MapPin, FileText, BarChart2, QrCode, ArrowLeft } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, string> = {
   tickets: '🎟', food: '🍽', drinks: '🥂', snacks: '🍿', fuel: '⛽', other: '📦',
@@ -336,7 +336,9 @@ export default function DashboardPage() {
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-4 py-3">
         <div className="max-w-lg mx-auto flex items-center justify-between">
           <div className="min-w-0">
-            <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium">EvenSteven</p>
+            <Link href="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground uppercase tracking-widest font-medium hover:text-foreground transition-colors">
+              <ArrowLeft size={11} strokeWidth={2.5} /><span>Back to Deck</span>
+            </Link>
             <h1 className="font-display text-xl text-foreground truncate">{event?.name ?? '…'}</h1>
           </div>
           <div className="flex items-center gap-1">
