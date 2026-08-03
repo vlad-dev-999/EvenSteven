@@ -85,7 +85,7 @@ export default function MembersPage() {
                           <span className="text-xs text-accent font-medium">you</span>
                         )}
                         {!m.claimed && (
-                          <span className="text-xs text-muted-foreground">not joined</span>
+                          <span className="text-xs text-muted-foreground">not seen</span>
                         )}
                       </div>
                     </div>

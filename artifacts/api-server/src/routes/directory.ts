@@ -277,13 +277,23 @@ router.get("/directory/events", async (_req, res): Promise<void> => {
 // ── POST /directory/events/:token/join ───────────────────────────────────────
 
 /**
- * Seamless event join for globally-authenticated directory members.
+ * Seamless event entry for globally-authenticated directory members.
  * Accepts x-person-id header (trusted — same model as x-member-id for expenses).
  * No PIN re-entry required: the global session already proved identity.
  *
- * - Already a member → return existing member record.
- * - Not yet a member → auto-create + return.
- * - Frozen event → 403.
+ * Two modes controlled by the optional `confirm` body flag:
+ *
+ * Without confirm (check mode — called on page load):
+ *   - Already an Attendee → mark Seen (set claimedAt) on first open → return
+ *     { wasAlreadyAttendee: true, memberId, memberName, isHost }
+ *   - Not an Attendee → return { wasAlreadyAttendee: false } — no member created.
+ *
+ * With { confirm: true } (join mode — called when user taps "Join Event"):
+ *   - Not yet an Attendee → create member with approvedAt + claimedAt → return
+ *     { wasAlreadyAttendee: false, memberId, memberName, isHost }
+ *   - Already an Attendee → same as check mode (idempotent).
+ *
+ * Frozen event → 403 for new joins; existing Attendees can still enter.
  */
 router.post("/directory/events/:token/join", async (req, res): Promise<void> => {
   const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
@@ -301,11 +311,6 @@ router.post("/directory/events/:token/join", async (req, res): Promise<void> => 
   const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
   if (!event) {
     res.status(404).json({ error: "Event not found" });
-    return;
-  }
-
-  if (event.frozen) {
-    res.status(403).json({ error: "Event is closed. New members cannot join." });
     return;
   }
 
@@ -330,18 +335,44 @@ router.post("/directory/events/:token/join", async (req, res): Promise<void> => 
     return;
   }
 
-  // Already a member?
+  // Already an Attendee?
   const [existing] = await db
     .select()
     .from(membersTable)
     .where(and(eq(membersTable.eventId, event.id), eq(membersTable.personId, personId)));
 
   if (existing) {
-    res.json({ memberId: existing.id, memberName: existing.name, isHost: existing.isHost });
+    // Mark Seen on first open (set claimedAt if not already set)
+    if (!existing.claimedAt) {
+      await db
+        .update(membersTable)
+        .set({ claimedAt: new Date() })
+        .where(eq(membersTable.id, existing.id));
+    }
+    res.json({
+      wasAlreadyAttendee: true,
+      memberId: existing.id,
+      memberName: existing.name,
+      isHost: existing.isHost,
+    });
     return;
   }
 
-  // Auto-add
+  // Not yet an Attendee — only create if the user explicitly confirmed joining
+  const confirm = req.body?.confirm === true;
+
+  if (!confirm) {
+    res.json({ wasAlreadyAttendee: false });
+    return;
+  }
+
+  if (event.frozen) {
+    res.status(403).json({ error: "Event is closed. New members cannot join." });
+    return;
+  }
+
+  // Explicit join: make them an Attendee and mark Seen immediately
+  const now = new Date();
   const [newMember] = await db
     .insert(membersTable)
     .values({
@@ -350,14 +381,20 @@ router.post("/directory/events/:token/join", async (req, res): Promise<void> => 
       personId: person.id,
       houseId: person.houseId,
       isHost: false,
-      approvedAt: new Date(),
+      approvedAt: now,
+      claimedAt: now,
     })
     .returning();
 
   const { logActivity } = await import("../lib/activity");
   await logActivity(event.id, "member_joined", { name: person.name });
 
-  res.json({ memberId: newMember.id, memberName: newMember.name, isHost: newMember.isHost });
+  res.json({
+    wasAlreadyAttendee: false,
+    memberId: newMember.id,
+    memberName: newMember.name,
+    isHost: newMember.isHost,
+  });
 });
 
 export default router;

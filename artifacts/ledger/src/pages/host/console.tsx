@@ -384,8 +384,8 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
                       <div className="flex items-center gap-2">
                         {m.isHost && <span className="text-xs text-muted-foreground">host</span>}
                         {m.claimed
-                          ? <span className="text-xs text-green-700">joined</span>
-                          : <span className="text-xs text-muted-foreground">not joined</span>}
+                          ? <span className="text-xs text-green-700">seen</span>
+                          : <span className="text-xs text-muted-foreground">not seen</span>}
                       </div>
                     </div>
                     {net !== 0 && (
