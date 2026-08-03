@@ -306,6 +306,7 @@ export const CreateEventResponse = zod.object({
   "hostMember": zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
+  "personId": zod.int().nullish().describe('Directory person ID, if this member was seeded from the directory'),
   "name": zod.string(),
   "familyId": zod.int().nullish(),
   "familyName": zod.string().nullish(),
@@ -408,6 +409,7 @@ export const SetSessionBody = zod.object({
 export const SetSessionResponse = zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
+  "personId": zod.int().nullish().describe('Directory person ID, if this member was seeded from the directory'),
   "name": zod.string(),
   "familyId": zod.int().nullish(),
   "familyName": zod.string().nullish(),
@@ -532,6 +534,7 @@ export const ListMembersParams = zod.object({
 export const ListMembersResponseItem = zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
+  "personId": zod.int().nullish().describe('Directory person ID, if this member was seeded from the directory'),
   "name": zod.string(),
   "familyId": zod.int().nullish(),
   "familyName": zod.string().nullish(),
@@ -565,6 +568,7 @@ export const AddAttendeeBody = zod.object({
 export const AddAttendeeResponse = zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
+  "personId": zod.int().nullish().describe('Directory person ID, if this member was seeded from the directory'),
   "name": zod.string(),
   "familyId": zod.int().nullish(),
   "familyName": zod.string().nullish(),
@@ -684,6 +688,7 @@ export const CreateJoinRequestResponse = zod.object({
   "member": zod.object({
   "id": zod.int(),
   "eventId": zod.int(),
+  "personId": zod.int().nullish().describe('Directory person ID, if this member was seeded from the directory'),
   "name": zod.string(),
   "familyId": zod.int().nullish(),
   "familyName": zod.string().nullish(),

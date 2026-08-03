@@ -29,6 +29,7 @@ router.get("/events/:token/members", async (req, res): Promise<void> => {
     .select({
       id: membersTable.id,
       eventId: membersTable.eventId,
+      personId: membersTable.personId,
       name: membersTable.name,
       familyId: membersTable.familyId,
       familyName: familiesTable.name,
@@ -51,6 +52,7 @@ router.get("/events/:token/members", async (req, res): Promise<void> => {
     members.map((m) => ({
       id: m.id,
       eventId: m.eventId,
+      personId: m.personId ?? null,
       name: m.name,
       familyId: m.familyId ?? null,
       familyName: m.familyName ?? null,

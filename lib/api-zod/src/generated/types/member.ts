@@ -9,6 +9,8 @@
 export interface Member {
   id: number;
   eventId: number;
+  /** Directory person ID, if this member was seeded from the directory */
+  personId?: number | null;
   name: string;
   familyId?: number | null;
   familyName?: string | null;

@@ -1179,6 +1179,10 @@ components:
           type: integer
         eventId:
           type: integer
+        personId:
+          type: integer
+          nullable: true
+          description: Directory person ID, if this member was seeded from the directory
         name:
           type: string
         familyId:
