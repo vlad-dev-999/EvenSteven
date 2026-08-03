@@ -52,6 +52,11 @@ export interface Person {
   createdAt: string;
 }
 
+export interface PersonPinResult {
+  /** Plaintext PIN shown once */
+  pin: string;
+}
+
 export interface PersonInput {
   /**
      * @minLength 1
@@ -73,6 +78,7 @@ export interface Event {
   createdAt: string;
   bannerImage?: string | null;
   tonightNoteTitle?: string | null;
+  /** @maxLength 300 */
   tonightNoteBody?: string | null;
   hostMemberName?: string | null;
 }
@@ -112,13 +118,9 @@ export interface EventCreated {
 }
 
 export interface IdentityMember {
-  /** Directory person ID (people.id) */
   id: number;
   name: string;
-  /** Whether this person has a PIN set in the directory */
-  hasPin: boolean;
-  /** Whether this person is already a participating member of this event */
-  inEvent: boolean;
+  claimed: boolean;
   avatar?: string | null;
   isHost: boolean;
 }
@@ -133,25 +135,25 @@ export interface IdentityHouse {
 
 export interface IdentityOptions {
   eventName: string;
+  eventPin: string;
   houses: IdentityHouse[];
 }
 
 export interface IdentifyInput {
-  /** Directory person ID */
-  personId: number;
-  /** Personal 4-digit PIN set by host in the directory */
-  pin: string;
+  memberId: number;
+  personalPin?: string | null;
 }
 
 export interface IdentifyResult {
   memberId: number;
   memberName: string;
   isHost: boolean;
+  /** Returned only on first claim */
+  personalPin?: string | null;
 }
 
-export interface PersonPin {
-  /** Plaintext 4-digit PIN, returned once. Store it — never returned again. */
-  pin: string;
+export interface AddAttendeeInput {
+  personId: number;
 }
 
 export interface SessionInput {

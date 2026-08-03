@@ -6,7 +6,7 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface IdentifyInput {
-  memberId: number;
-  personalPin?: string | null;
+export interface PersonPinResult {
+  /** Plaintext PIN shown once */
+  pin: string;
 }

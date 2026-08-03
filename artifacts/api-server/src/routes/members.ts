@@ -8,6 +8,7 @@ import {
   housesTable,
   expensesTable,
   expenseParticipantsTable,
+  peopleTable,
 } from "@workspace/db";
 import { logActivity } from "../lib/activity";
 import { requireHost, getMemberIdFromHeader } from "../lib/host-auth";
@@ -63,6 +64,94 @@ router.get("/events/:token/members", async (req, res): Promise<void> => {
       createdAt: m.createdAt,
     })),
   );
+});
+
+/**
+ * POST /events/:token/members — add a directory person as an attendee (host only)
+ */
+router.post("/events/:token/members", requireHost, async (req, res): Promise<void> => {
+  const token = Array.isArray(req.params.token) ? req.params.token[0] : req.params.token;
+  const { personId } = req.body ?? {};
+
+  if (typeof personId !== "number") {
+    res.status(400).json({ error: "personId is required" });
+    return;
+  }
+
+  const [event] = await db.select().from(eventsTable).where(eq(eventsTable.token, token));
+  if (!event) {
+    res.status(404).json({ error: "Event not found" });
+    return;
+  }
+
+  const [person] = await db.select().from(peopleTable).where(eq(peopleTable.id, personId));
+  if (!person || !person.active) {
+    res.status(404).json({ error: "Person not found or inactive" });
+    return;
+  }
+
+  // Prevent duplicates — check if this person is already a member of this event
+  const [existing] = await db
+    .select()
+    .from(membersTable)
+    .where(and(eq(membersTable.eventId, event.id), eq(membersTable.personId, personId)));
+
+  if (existing) {
+    res.status(400).json({ error: "Person is already an attendee of this event" });
+    return;
+  }
+
+  const [newMember] = await db
+    .insert(membersTable)
+    .values({
+      eventId: event.id,
+      name: person.name,
+      personId: person.id,
+      houseId: person.houseId,
+      isHost: false,
+      approvedAt: new Date(),
+    })
+    .returning();
+
+  await logActivity(event.id, "attendee_added", { memberName: person.name });
+
+  // Return the shaped member (with house info via join)
+  const [shaped] = await db
+    .select({
+      id: membersTable.id,
+      eventId: membersTable.eventId,
+      name: membersTable.name,
+      familyId: membersTable.familyId,
+      familyName: familiesTable.name,
+      houseId: membersTable.houseId,
+      houseName: housesTable.name,
+      houseCrest: housesTable.crest,
+      houseAccentColor: housesTable.accentColor,
+      isHost: membersTable.isHost,
+      approvedAt: membersTable.approvedAt,
+      claimed: membersTable.claimedAt,
+      createdAt: membersTable.createdAt,
+    })
+    .from(membersTable)
+    .leftJoin(familiesTable, eq(membersTable.familyId, familiesTable.id))
+    .leftJoin(housesTable, eq(membersTable.houseId, housesTable.id))
+    .where(eq(membersTable.id, newMember.id));
+
+  res.status(201).json({
+    id: shaped.id,
+    eventId: shaped.eventId,
+    name: shaped.name,
+    familyId: shaped.familyId ?? null,
+    familyName: shaped.familyName ?? null,
+    houseId: shaped.houseId ?? null,
+    houseName: shaped.houseName ?? null,
+    houseCrest: shaped.houseCrest ?? null,
+    houseAccentColor: shaped.houseAccentColor ?? null,
+    isHost: shaped.isHost,
+    approved: !!shaped.approvedAt,
+    claimed: !!shaped.claimed,
+    createdAt: shaped.createdAt,
+  });
 });
 
 /**

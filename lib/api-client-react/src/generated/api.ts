@@ -21,6 +21,7 @@ import type {
 
 import type {
   ActivityEntry,
+  AddAttendeeInput,
   BalanceSummary,
   Event,
   EventCreated,
@@ -46,7 +47,7 @@ import type {
   Member,
   Person,
   PersonInput,
-  PersonPin,
+  PersonPinResult,
   SessionInput,
   SessionResult,
   Settlement
@@ -743,6 +744,77 @@ export const useCreatePerson = <TError = ErrorType<unknown>,
       return useMutation(getCreatePersonMutationOptions(options));
     }
 
+export const getResetPersonPinUrl = (id: number,) => {
+
+
+
+
+  return `/api/people/${id}/pin`
+}
+
+/**
+ * @summary Generate or reset a person's personal PIN (host only)
+ */
+export const resetPersonPin = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PersonPinResult> => {
+
+  return customFetch<PersonPinResult>(getResetPersonPinUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getResetPersonPinMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['resetPersonPin'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetPersonPin>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  resetPersonPin(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetPersonPinMutationResult = NonNullable<Awaited<ReturnType<typeof resetPersonPin>>>
+
+    export type ResetPersonPinMutationError = ErrorType<void>
+
+    /**
+ * @summary Generate or reset a person's personal PIN (host only)
+ */
+export const useResetPersonPin = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetPersonPin>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getResetPersonPinMutationOptions(options));
+    }
+
 export const getUpdatePersonUrl = (id: number,) => {
 
 
@@ -884,57 +956,6 @@ export const useDeletePerson = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeletePersonMutationOptions(options));
-    }
-
-export const getResetPersonPinUrl = (id: number) => {
-  return `/api/people/${id}/pin`
-}
-
-/**
- * @summary Generate or reset a person's personal PIN (host only).
- * Returns the plaintext PIN once — store it and share with the person.
- */
-export const resetPersonPin = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PersonPin> => {
-  return customFetch<PersonPin>(getResetPersonPinUrl(id), {
-    ...options,
-    method: 'POST',
-  });
-}
-
-export const getResetPersonPinMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext> => {
-
-const mutationKey = ['resetPersonPin'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetPersonPin>>, {id: number}> = (props) => {
-          const {id} = props ?? {};
-          return resetPersonPin(id, requestOptions)
-        }
-
-  return { mutationFn, ...mutationOptions }
-}
-
-    export type ResetPersonPinMutationResult = NonNullable<Awaited<ReturnType<typeof resetPersonPin>>>
-    export type ResetPersonPinMutationError = ErrorType<void>
-
-    /**
- * @summary Generate or reset a person's personal PIN (host only)
- */
-export const useResetPersonPin = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof resetPersonPin>>,
-        TError,
-        {id: number},
-        TContext
-      > => {
-      return useMutation(getResetPersonPinMutationOptions(options));
     }
 
 export const getListEventsUrl = () => {
@@ -1755,6 +1776,78 @@ export function useListMembers<TData = Awaited<ReturnType<typeof listMembers>>, 
 
 
 
+
+export const getAddAttendeeUrl = (token: string,) => {
+
+
+
+
+  return `/api/events/${token}/members`
+}
+
+/**
+ * @summary Add a directory person as an attendee (host only)
+ */
+export const addAttendee = async (token: string,
+    addAttendeeInput: AddAttendeeInput, options?: Parameters<typeof customFetch>[1]): Promise<Member> => {
+
+  return customFetch<Member>(getAddAttendeeUrl(token),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(addAttendeeInput)
+  }
+);}
+
+
+
+
+
+export const getAddAttendeeMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAttendee>>, TError,{token: string;data: BodyType<AddAttendeeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addAttendee>>, TError,{token: string;data: BodyType<AddAttendeeInput>}, TContext> => {
+
+const mutationKey = ['addAttendee'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addAttendee>>, {token: string;data: BodyType<AddAttendeeInput>}> = (props) => {
+          const {token,data} = props ?? {};
+
+          return  addAttendee(token,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddAttendeeMutationResult = NonNullable<Awaited<ReturnType<typeof addAttendee>>>
+    export type AddAttendeeMutationBody = BodyType<AddAttendeeInput>
+    export type AddAttendeeMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a directory person as an attendee (host only)
+ */
+export const useAddAttendee = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addAttendee>>, TError,{token: string;data: BodyType<AddAttendeeInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addAttendee>>,
+        TError,
+        {token: string;data: BodyType<AddAttendeeInput>},
+        TContext
+      > => {
+      return useMutation(getAddAttendeeMutationOptions(options));
+    }
 
 export const getRemoveMemberUrl = (token: string,
     memberId: number,) => {

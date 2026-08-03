@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface PersonPin {
-  /** Plaintext 4-digit PIN, returned once. Store securely — never returned again. */
-  pin: string;
+export interface AddAttendeeInput {
+  personId: number;
 }

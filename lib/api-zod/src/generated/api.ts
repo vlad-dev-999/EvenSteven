@@ -175,6 +175,22 @@ export const CreatePersonResponse = zod.object({
 
 
 /**
+ * @summary Generate or reset a person's personal PIN (host only)
+ */
+export const ResetPersonPinParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const ResetPersonPinHeader = zod.object({
+  "x-host-token": zod.string()
+})
+
+export const ResetPersonPinResponse = zod.object({
+  "pin": zod.string().describe('Plaintext PIN shown once')
+})
+
+
+/**
  * @summary Update a person (host only)
  */
 export const UpdatePersonParams = zod.object({
@@ -230,6 +246,10 @@ export const ListEventsHeader = zod.object({
   "x-host-token": zod.string()
 })
 
+export const listEventsResponseTonightNoteBodyMax = 300;
+
+
+
 export const ListEventsResponseItem = zod.object({
   "id": zod.int(),
   "name": zod.string(),
@@ -240,7 +260,7 @@ export const ListEventsResponseItem = zod.object({
   "createdAt": zod.coerce.date(),
   "bannerImage": zod.string().nullish(),
   "tonightNoteTitle": zod.string().nullish(),
-  "tonightNoteBody": zod.string().nullish(),
+  "tonightNoteBody": zod.string().max(listEventsResponseTonightNoteBodyMax).nullish(),
   "hostMemberName": zod.string().nullish()
 })
 export const ListEventsResponse = zod.array(ListEventsResponseItem)
@@ -264,6 +284,10 @@ export const CreateEventBody = zod.object({
   "attendeePersonIds": zod.array(zod.int()).min(1)
 })
 
+export const createEventResponseEventTonightNoteBodyMax = 300;
+
+
+
 export const CreateEventResponse = zod.object({
   "event": zod.object({
   "id": zod.int(),
@@ -272,7 +296,11 @@ export const CreateEventResponse = zod.object({
   "frozen": zod.boolean(),
   "memberCount": zod.int(),
   "totalExpenses": zod.int(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "bannerImage": zod.string().nullish(),
+  "tonightNoteTitle": zod.string().nullish(),
+  "tonightNoteBody": zod.string().max(createEventResponseEventTonightNoteBodyMax).nullish(),
+  "hostMemberName": zod.string().nullish()
 }),
   "pin": zod.string().describe('4-digit PIN for sharing'),
   "hostMember": zod.object({
@@ -300,6 +328,10 @@ export const GetEventParams = zod.object({
   "token": zod.coerce.string()
 })
 
+export const getEventResponseTonightNoteBodyMax = 300;
+
+
+
 export const GetEventResponse = zod.object({
   "id": zod.int(),
   "name": zod.string(),
@@ -310,7 +342,7 @@ export const GetEventResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "bannerImage": zod.string().nullish(),
   "tonightNoteTitle": zod.string().nullish(),
-  "tonightNoteBody": zod.string().nullish(),
+  "tonightNoteBody": zod.string().max(getEventResponseTonightNoteBodyMax).nullish(),
   "hostMemberName": zod.string().nullish()
 })
 
@@ -416,6 +448,10 @@ export const FreezeEventHeader = zod.object({
   "x-host-token": zod.string()
 })
 
+export const freezeEventResponseTonightNoteBodyMax = 300;
+
+
+
 export const FreezeEventResponse = zod.object({
   "id": zod.int(),
   "name": zod.string(),
@@ -423,7 +459,11 @@ export const FreezeEventResponse = zod.object({
   "frozen": zod.boolean(),
   "memberCount": zod.int(),
   "totalExpenses": zod.int(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "bannerImage": zod.string().nullish(),
+  "tonightNoteTitle": zod.string().nullish(),
+  "tonightNoteBody": zod.string().max(freezeEventResponseTonightNoteBodyMax).nullish(),
+  "hostMemberName": zod.string().nullish()
 })
 
 
@@ -438,6 +478,10 @@ export const UnfreezeEventHeader = zod.object({
   "x-host-token": zod.string()
 })
 
+export const unfreezeEventResponseTonightNoteBodyMax = 300;
+
+
+
 export const UnfreezeEventResponse = zod.object({
   "id": zod.int(),
   "name": zod.string(),
@@ -445,7 +489,11 @@ export const UnfreezeEventResponse = zod.object({
   "frozen": zod.boolean(),
   "memberCount": zod.int(),
   "totalExpenses": zod.int(),
-  "createdAt": zod.coerce.date()
+  "createdAt": zod.coerce.date(),
+  "bannerImage": zod.string().nullish(),
+  "tonightNoteTitle": zod.string().nullish(),
+  "tonightNoteBody": zod.string().max(unfreezeEventResponseTonightNoteBodyMax).nullish(),
+  "hostMemberName": zod.string().nullish()
 })
 
 
@@ -497,6 +545,38 @@ export const ListMembersResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListMembersResponse = zod.array(ListMembersResponseItem)
+
+
+/**
+ * @summary Add a directory person as an attendee (host only)
+ */
+export const AddAttendeeParams = zod.object({
+  "token": zod.coerce.string()
+})
+
+export const AddAttendeeHeader = zod.object({
+  "x-host-token": zod.string()
+})
+
+export const AddAttendeeBody = zod.object({
+  "personId": zod.int()
+})
+
+export const AddAttendeeResponse = zod.object({
+  "id": zod.int(),
+  "eventId": zod.int(),
+  "name": zod.string(),
+  "familyId": zod.int().nullish(),
+  "familyName": zod.string().nullish(),
+  "houseId": zod.int().nullish(),
+  "houseName": zod.string().nullish(),
+  "houseCrest": zod.string().nullish(),
+  "houseAccentColor": zod.string().nullish(),
+  "isHost": zod.boolean(),
+  "approved": zod.boolean(),
+  "claimed": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})
 
 
 /**

@@ -17,6 +17,8 @@ import {
   useGetBalances,
   useGetSettlements,
   useGetEventSummary,
+  useAddAttendee,
+  useRemoveMember,
 } from '@workspace/api-client-react';
 import type { House, Person } from '@workspace/api-client-react';
 import { useHostSession } from '@/hooks/use-host-session';
@@ -331,13 +333,26 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
 
 // ─── Event Overview Panel ──────────────────────────────────────────────────────
 function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToken: string }) {
+  const hostHeaders = { 'x-host-token': hostToken };
+  const queryClient = useQueryClient();
+
   const { data: members = [] } = useListMembers(eventToken, { query: { enabled: !!eventToken } as any });
   const { data: balancesData } = useGetBalances(eventToken, { query: { enabled: !!eventToken } as any });
   const { data: settlements = [] } = useGetSettlements(eventToken, { query: { enabled: !!eventToken } as any });
   const { data: summary } = useGetEventSummary(eventToken, { query: { enabled: !!eventToken } as any });
+  const { data: allPeople = [] } = useListPeople();
+
+  const addAttendeeMutation = useAddAttendee({ request: { headers: hostHeaders } });
+  const removeMemberMutation = useRemoveMember({ request: { headers: hostHeaders } });
+
+  const [showAddDialog, setShowAddDialog] = useState(false);
 
   const approved = members.filter(m => m.approved);
   const claimed = members.filter(m => m.claimed);
+
+  // People in the directory who are not yet attendees of this event
+  const memberPersonIds = new Set(members.map(m => (m as any).personId).filter(Boolean));
+  const availablePeople = allPeople.filter(p => p.active && !memberPersonIds.has(p.id));
 
   const houseMap = new Map<string, typeof members>();
   const noHouse: typeof members = [];
@@ -347,6 +362,79 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
     if (!houseMap.has(key)) houseMap.set(key, []);
     houseMap.get(key)!.push(m);
   }
+
+  const invalidateMembers = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/events/${eventToken}/members`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/events/${eventToken}/balances`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/events/${eventToken}/settlements`] });
+    queryClient.invalidateQueries({ queryKey: ['/api/events'] });
+  };
+
+  const handleAddAttendee = (personId: number, personName: string) => {
+    addAttendeeMutation.mutate(
+      { token: eventToken, data: { personId } },
+      {
+        onSuccess: () => {
+          invalidateMembers();
+          toast.success(`${personName} added to the event.`);
+        },
+        onError: () => toast.error('Could not add attendee. Please try again.'),
+      },
+    );
+  };
+
+  const handleRemoveMember = (memberId: number, memberName: string) => {
+    if (!confirm(`Remove ${memberName} from this event?`)) return;
+    removeMemberMutation.mutate(
+      { token: eventToken, memberId },
+      {
+        onSuccess: () => {
+          invalidateMembers();
+          toast.success(`${memberName} removed from the event.`);
+        },
+        onError: () => toast.error('Could not remove attendee. Please try again.'),
+      },
+    );
+  };
+
+  const renderMemberRow = (m: (typeof members)[0]) => {
+    const accentColor = m.houseAccentColor ?? undefined;
+    const balance = balancesData?.memberBalances.find(b => b.memberId === m.id);
+    const net = balance?.netBalance ?? 0;
+    return (
+      <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+          style={{ backgroundColor: accentColor ?? 'hsl(var(--primary))' }}>
+          {m.name[0].toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
+          <div className="flex items-center gap-2">
+            {m.isHost && <span className="text-xs text-muted-foreground">host</span>}
+            {m.claimed
+              ? <span className="text-xs text-green-700">seen</span>
+              : <span className="text-xs text-muted-foreground">not seen</span>}
+          </div>
+        </div>
+        {net !== 0 && (
+          <p className={cn('text-xs font-semibold tabular-nums', net > 0 ? 'text-green-700' : 'text-amber-700')}>
+            {net > 0 ? '+' : ''}{formatCurrency(net)}
+          </p>
+        )}
+        {!m.isHost && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive shrink-0 h-7 px-2 text-xs"
+            onClick={() => handleRemoveMember(m.id, m.name)}
+            disabled={removeMemberMutation.isPending}
+          >
+            Remove
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -364,55 +452,25 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
       </div>
 
       <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Members</h3>
-        {Array.from(houseMap.entries()).map(([houseName, hMembers]) => {
-          const accentColor = hMembers[0]?.houseAccentColor ?? undefined;
-          return (
-            <div key={houseName} className="space-y-1">
-              <p className="text-xs text-muted-foreground px-1 font-medium">{houseName}</p>
-              {hMembers.map(m => {
-                const balance = balancesData?.memberBalances.find(b => b.memberId === m.id);
-                const net = balance?.netBalance ?? 0;
-                return (
-                  <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
-                      style={{ backgroundColor: accentColor ?? 'hsl(var(--primary))' }}>
-                      {m.name[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{m.name}</p>
-                      <div className="flex items-center gap-2">
-                        {m.isHost && <span className="text-xs text-muted-foreground">host</span>}
-                        {m.claimed
-                          ? <span className="text-xs text-green-700">seen</span>
-                          : <span className="text-xs text-muted-foreground">not seen</span>}
-                      </div>
-                    </div>
-                    {net !== 0 && (
-                      <p className={cn('text-xs font-semibold tabular-nums', net > 0 ? 'text-green-700' : 'text-amber-700')}>
-                        {net > 0 ? '+' : ''}{formatCurrency(net)}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-        {noHouse.map(m => {
-          const balance = balancesData?.memberBalances.find(b => b.memberId === m.id);
-          const net = balance?.netBalance ?? 0;
-          return (
-            <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5">
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">{m.name[0].toUpperCase()}</div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{m.name}</p>
-                {m.isHost && <p className="text-xs text-muted-foreground">host</p>}
-              </div>
-              {net !== 0 && <p className={cn('text-xs font-semibold tabular-nums', net > 0 ? 'text-green-700' : 'text-amber-700')}>{net > 0 ? '+' : ''}{formatCurrency(net)}</p>}
-            </div>
-          );
-        })}
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Attendees</h3>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 px-3 text-xs"
+            onClick={() => setShowAddDialog(true)}
+            disabled={availablePeople.length === 0}
+          >
+            + Add
+          </Button>
+        </div>
+        {Array.from(houseMap.entries()).map(([houseName, hMembers]) => (
+          <div key={houseName} className="space-y-1">
+            <p className="text-xs text-muted-foreground px-1 font-medium">{houseName}</p>
+            {hMembers.map(renderMemberRow)}
+          </div>
+        ))}
+        {noHouse.map(renderMemberRow)}
       </div>
 
       {(settlements as any[]).length > 0 && (
@@ -444,6 +502,43 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
           </div>
         </div>
       )}
+
+      {/* Add attendee dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-sm max-h-[80dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl font-normal">Add Attendee</DialogTitle>
+            <DialogDescription>Select a person from the directory to add to this event.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1 py-1">
+            {availablePeople.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Everyone in the directory is already attending.</p>
+            ) : (
+              availablePeople.map(p => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors text-left disabled:opacity-50"
+                  onClick={() => { handleAddAttendee(p.id, p.name); setShowAddDialog(false); }}
+                  disabled={addAttendeeMutation.isPending}
+                >
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+                    style={{ backgroundColor: p.houseAccentColor ?? 'hsl(var(--primary))' }}>
+                    {p.avatar ? p.avatar : p.name[0].toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.houseName}</p>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

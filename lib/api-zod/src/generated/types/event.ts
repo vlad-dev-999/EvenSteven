@@ -16,6 +16,7 @@ export interface Event {
   createdAt: Date;
   bannerImage?: string | null;
   tonightNoteTitle?: string | null;
+  /** @maxLength 300 */
   tonightNoteBody?: string | null;
   hostMemberName?: string | null;
 }

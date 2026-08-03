@@ -8,6 +8,7 @@
 
 export * from './activityEntry';
 export * from './activityEntryMetadata';
+export * from './addAttendeeInput';
 export * from './balanceSummary';
 export * from './event';
 export * from './eventCreated';
@@ -46,7 +47,7 @@ export * from './member';
 export * from './memberBalance';
 export * from './person';
 export * from './personInput';
-export * from './personPin';
+export * from './personPinResult';
 export * from './sessionInput';
 export * from './sessionResult';
 export * from './settlement';

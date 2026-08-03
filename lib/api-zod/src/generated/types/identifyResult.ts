@@ -10,4 +10,6 @@ export interface IdentifyResult {
   memberId: number;
   memberName: string;
   isHost: boolean;
+  /** Returned only on first claim */
+  personalPin?: string | null;
 }

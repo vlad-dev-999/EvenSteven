@@ -221,6 +221,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/Person"
 
+  /people/{id}/pin:
+    post:
+      operationId: resetPersonPin
+      tags: [people]
+      summary: Generate or reset a person's personal PIN (host only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: New PIN (plaintext, shown once)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PersonPinResult"
+        "404":
+          description: Person not found
+
   /people/{id}:
     patch:
       operationId: updatePerson
@@ -523,6 +549,38 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Member"
+    post:
+      operationId: addAttendee
+      tags: [members]
+      summary: Add a directory person as an attendee (host only)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: x-host-token
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddAttendeeInput"
+      responses:
+        "201":
+          description: Attendee added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Person is already an attendee or inactive
+        "404":
+          description: Event or person not found
 
   /events/{token}/members/{memberId}:
     delete:
@@ -944,6 +1002,14 @@ components:
           type: string
           format: date-time
 
+    PersonPinResult:
+      type: object
+      required: [pin]
+      properties:
+        pin:
+          type: string
+          description: Plaintext PIN shown once
+
     PersonInput:
       type: object
       required: [name, houseId]
@@ -1096,6 +1162,14 @@ components:
           description: Returned only on first claim
 
     # ── Members ───────────────────────────────────────────────────────────
+
+
+    AddAttendeeInput:
+      type: object
+      required: [personId]
+      properties:
+        personId:
+          type: integer
 
     Member:
       type: object
