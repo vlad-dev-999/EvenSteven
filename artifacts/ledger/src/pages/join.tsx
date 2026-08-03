@@ -151,7 +151,7 @@ export default function JoinPage() {
             </p>
           )}
           {!errorMsg && (
-            <Button onClick={handleJoin} disabled={phase === 'joining'}>
+            <Button onClick={handleJoin}>
               Join Event
             </Button>
           )}

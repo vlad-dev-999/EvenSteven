@@ -10,7 +10,7 @@ const ALLOWED_KEYS = new Set(["skipper_note"]);
 
 /** GET /settings/:key — read a global setting (public) */
 router.get("/settings/:key", async (req, res): Promise<void> => {
-  const key = req.params.key;
+  const key = Array.isArray(req.params.key) ? req.params.key[0] : req.params.key;
   if (!ALLOWED_KEYS.has(key)) {
     res.status(404).json({ error: "Unknown setting" });
     return;
@@ -26,7 +26,7 @@ router.get("/settings/:key", async (req, res): Promise<void> => {
 
 /** PATCH /settings/:key — update a global setting (host only) */
 router.patch("/settings/:key", requireHost, async (req, res): Promise<void> => {
-  const key = req.params.key;
+  const key = Array.isArray(req.params.key) ? req.params.key[0] : req.params.key;
   if (!ALLOWED_KEYS.has(key)) {
     res.status(404).json({ error: "Unknown setting" });
     return;
