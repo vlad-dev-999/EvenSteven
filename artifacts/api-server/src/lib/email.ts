@@ -34,6 +34,7 @@ export async function sendActivationOtp({ to, name, otp }: SendOtpOptions): Prom
   // Lazy import so nodemailer is only loaded when needed
   const nodemailer = await import("nodemailer");
 
+  console.info("[email] Creating SMTP transport");
   const transporter = nodemailer.default.createTransport({
     host,
     port: parseInt(process.env.SMTP_PORT ?? "587", 10),
@@ -41,33 +42,51 @@ export async function sendActivationOtp({ to, name, otp }: SendOtpOptions): Prom
     auth: process.env.SMTP_USER
       ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
       : undefined,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 10_000,
   });
+
+  console.info("[email] Verifying SMTP");
+  try {
+    await transporter.verify();
+  } catch (err) {
+    console.error("[email] SMTP verification failed", err);
+    throw Object.assign(new Error("SMTP verification failed"), { smtpVerifyFailed: true });
+  }
+  console.info("[email] SMTP verified");
 
   const from = process.env.SMTP_FROM ?? `"EvenSteven" <noreply@${host}>`;
 
-  await transporter.sendMail({
-    from,
-    to: `"${name}" <${to}>`,
-    subject: "Your EvenSteven activation code",
-    text: [
-      `Hi ${name},`,
-      ``,
-      `Your one-time activation code is:`,
-      ``,
-      `  ${otp}`,
-      ``,
-      `It expires in 15 minutes. Enter it to activate your account and choose a PIN.`,
-      ``,
-      `If you didn't request this, you can safely ignore this email.`,
-    ].join("\n"),
-    html: `
-      <p>Hi ${name},</p>
-      <p>Your one-time activation code is:</p>
-      <p style="font-size:2em;letter-spacing:0.3em;font-weight:bold">${otp}</p>
-      <p>It expires in 15 minutes. Enter it to activate your account and choose a PIN.</p>
-      <p style="color:#666;font-size:0.9em">If you didn't request this, you can safely ignore this email.</p>
-    `,
-  });
+  console.info("[email] Sending email");
+  try {
+    await transporter.sendMail({
+      from,
+      to: `"${name}" <${to}>`,
+      subject: "Your EvenSteven activation code",
+      text: [
+        `Hi ${name},`,
+        ``,
+        `Your one-time activation code is:`,
+        ``,
+        `  ${otp}`,
+        ``,
+        `It expires in 15 minutes. Enter it to activate your account and choose a PIN.`,
+        ``,
+        `If you didn't request this, you can safely ignore this email.`,
+      ].join("\n"),
+      html: `
+        <p>Hi ${name},</p>
+        <p>Your one-time activation code is:</p>
+        <p style="font-size:2em;letter-spacing:0.3em;font-weight:bold">${otp}</p>
+        <p>It expires in 15 minutes. Enter it to activate your account and choose a PIN.</p>
+        <p style="color:#666;font-size:0.9em">If you didn't request this, you can safely ignore this email.</p>
+      `,
+    });
+  } catch (err) {
+    console.error("[email] sendMail failed", err);
+    throw err;
+  }
 
   return { sent: true };
 }
