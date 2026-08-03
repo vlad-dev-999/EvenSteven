@@ -33,6 +33,14 @@ export async function sendActivationOtp({ to, name, otp }: SendOtpOptions): Prom
 
   // Lazy import so nodemailer is only loaded when needed
   const nodemailer = await import("nodemailer");
+  const dns = await import("dns/promises");
+
+  const [ipv4, ipv6] = await Promise.all([
+    dns.resolve4(host),
+    dns.resolve6(host).catch(() => [] as string[]),
+  ]);
+  console.info("[email] DNS resolve4", host, ipv4);
+  console.info("[email] DNS resolve6", host, ipv6);
 
   console.info("[email] Creating SMTP transport");
   const transporter = nodemailer.default.createTransport({
@@ -45,13 +53,14 @@ export async function sendActivationOtp({ to, name, otp }: SendOtpOptions): Prom
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 10_000,
+    family: 4,
   });
 
   console.info("[email] Verifying SMTP");
   try {
     await transporter.verify();
   } catch (err) {
-    console.error("[email] SMTP verification failed", err);
+    console.error("[email] SMTP verification failed — resolved IPv4", ipv4, "socket error", err);
     throw Object.assign(new Error("SMTP verification failed"), { smtpVerifyFailed: true });
   }
   console.info("[email] SMTP verified");
