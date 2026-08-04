@@ -24,12 +24,13 @@ import {
   ListExpensesResponse,
 } from "@workspace/api-zod";
 import { logActivity } from "../lib/activity";
+import { allocateExpense } from "../lib/allocation";
 
 const router: IRouter = Router();
 
 /**
- * Compute expense participants from split type.
- * Returns array of { memberId, shareAmount }
+ * Fetch approved members for an event and delegate to the pure allocateExpense()
+ * function. Returns array of { memberId, shareAmount } ready for DB insertion.
  */
 async function computeParticipants(
   eventId: number,
@@ -38,38 +39,22 @@ async function computeParticipants(
   participantIds: number[] | undefined,
   houseIds: number[] | undefined,
 ): Promise<{ memberId: number; shareAmount: number }[]> {
-  const approvedMembers = await db
+  const allMembers = await db
     .select()
     .from(membersTable)
     .where(and(eq(membersTable.eventId, eventId)));
 
-  const approved = approvedMembers.filter((m) => !!m.approvedAt);
+  const approvedMembers = allMembers
+    .filter((m) => !!m.approvedAt)
+    .map((m) => ({ id: m.id, houseId: m.houseId ?? null }));
 
-  let targetMemberIds: number[] = [];
+  const allocations = allocateExpense(
+    { amount, splitType },
+    approvedMembers,
+    { houseIds, participantIds },
+  );
 
-  if (splitType === "everyone") {
-    targetMemberIds = approved.map((m) => m.id);
-  } else if (splitType === "families" && houseIds && houseIds.length > 0) {
-    // Group by directory-level houseId (same mechanism used by house settlement)
-    const houseMembers = approved.filter(
-      (m) => m.houseId !== null && houseIds.includes(m.houseId),
-    );
-    targetMemberIds = houseMembers.map((m) => m.id);
-  } else if (splitType === "members" && participantIds && participantIds.length > 0) {
-    targetMemberIds = participantIds.filter((id) => approved.some((m) => m.id === id));
-  }
-
-  if (targetMemberIds.length === 0) {
-    targetMemberIds = approved.map((m) => m.id);
-  }
-
-  const share = Math.floor(amount / targetMemberIds.length);
-  const remainder = amount - share * targetMemberIds.length;
-
-  return targetMemberIds.map((memberId, index) => ({
-    memberId,
-    shareAmount: share + (index === 0 ? remainder : 0),
-  }));
+  return allocations.map((a) => ({ memberId: a.memberId, shareAmount: a.amount }));
 }
 
 /** Build expense response shape */
