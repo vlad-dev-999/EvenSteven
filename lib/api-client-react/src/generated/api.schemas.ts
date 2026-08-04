@@ -48,14 +48,14 @@ export interface Person {
   houseCrest?: string | null;
   houseAccentColor?: string | null;
   avatar?: string | null;
-  personalColor?: string | null;
   active: boolean;
+  /** True once the member has verified their email and chosen their own PIN */
+  activated: boolean;
+  /** True if a PIN (admin-set or self-chosen) is currently set */
+  hasPin: boolean;
+  /** Email address registered during activation */
+  email?: string | null;
   createdAt: string;
-}
-
-export interface PersonPinResult {
-  /** Plaintext PIN shown once */
-  pin: string;
 }
 
 export interface PersonInput {
@@ -66,7 +66,6 @@ export interface PersonInput {
   name: string;
   houseId: number;
   avatar?: string | null;
-  personalColor?: string | null;
   active?: boolean;
 }
 

@@ -194,9 +194,6 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
   const [editing, setEditing] = useState<Person | null>(null);
   const [form, setForm] = useState({ name: '', houseId: 0, avatar: '', active: true });
 
-  // PIN reveal dialog
-  const [shownPin, setShownPin] = useState<{ name: string; pin: string } | null>(null);
-
   const openAdd = () => { setEditing(null); setForm({ name: '', houseId: houses[0]?.id ?? 0, avatar: '', active: true }); setShowDialog(true); };
   const openEdit = (p: Person) => { setEditing(p); setForm({ name: p.name, houseId: p.houseId, avatar: p.avatar ?? '', active: p.active }); setShowDialog(true); };
 
@@ -215,15 +212,14 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
     deleteMutation.mutate({ id: p.id }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/people'] }); toast.success(`${p.name} removed.`); } });
   };
 
-  const handleResetPin = (p: Person) => {
-    const action = (p as any).hasPin ? 'Reset' : 'Set';
-    if (!confirm(`${action} PIN for ${p.name}?${(p as any).hasPin ? " Their current PIN will stop working and they'll need to re-activate." : ''}`)) return;
+  const handleResetAccess = (p: Person) => {
+    if (!confirm(`Reset access for ${p.name}?\n\nThis will clear their PIN and activation. They will need to re-activate using their email address before they can log in again.`)) return;
     pinMutation.mutate({ id: p.id }, {
-      onSuccess: (result) => {
+      onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['/api/people'] });
-        setShownPin({ name: p.name, pin: result.pin });
+        toast.success(`${p.name}'s access has been reset. They can re-activate using their email.`);
       },
-      onError: () => toast.error('Could not reset PIN. Please try again.'),
+      onError: () => toast.error('Could not reset access. Please try again.'),
     });
   };
 
@@ -259,11 +255,14 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{p.name}</p>
+                    {p.email && (
+                      <p className="text-xs text-muted-foreground truncate">{p.email}</p>
+                    )}
                     <div className="flex items-center gap-1.5 flex-wrap">
                       {!p.active && <span className="text-xs text-muted-foreground">inactive</span>}
-                      {(p as any).activated
+                      {p.activated
                         ? <span className="text-xs text-green-700 flex items-center gap-0.5"><KeyRound size={10} />Activated</span>
-                        : (p as any).hasPin
+                        : p.hasPin
                           ? <span className="text-xs text-amber-700 flex items-center gap-0.5"><KeyRound size={10} />Admin PIN (not self-activated)</span>
                           : <span className="text-xs text-muted-foreground flex items-center gap-0.5"><KeyRound size={10} />Not activated</span>
                       }
@@ -274,10 +273,10 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
                       size="sm"
                       variant="ghost"
                       className="text-xs"
-                      onClick={() => handleResetPin(p)}
+                      onClick={() => handleResetAccess(p)}
                       disabled={pinMutation.isPending}
                     >
-                      Reset PIN
+                      Reset Access
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(p)}>Edit</Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => handleDelete(p)}>Remove</Button>
@@ -342,25 +341,6 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
         </DialogContent>
       </Dialog>
 
-      {/* PIN reveal dialog — shown once after reset */}
-      <Dialog open={!!shownPin} onOpenChange={() => setShownPin(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl font-normal">
-              {shownPin?.name}'s new PIN
-            </DialogTitle>
-            <DialogDescription>
-              Share this with {shownPin?.name}. It won't be shown again.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 text-center">
-            <p className="font-display text-7xl text-foreground tracking-[0.4em]">{shownPin?.pin}</p>
-          </div>
-          <DialogFooter>
-            <Button className="w-full" onClick={() => setShownPin(null)}>Done — I've shared it</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

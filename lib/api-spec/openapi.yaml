@@ -225,7 +225,7 @@ paths:
     post:
       operationId: resetPersonPin
       tags: [people]
-      summary: Generate or reset a person's personal PIN (host only)
+      summary: Reset a person's access credentials (host only). Clears PIN, activation state, and pending OTP so the member must re-activate via email OTP.
       parameters:
         - name: id
           in: path
@@ -238,12 +238,8 @@ paths:
           schema:
             type: string
       responses:
-        "200":
-          description: New PIN (plaintext, shown once)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/PersonPinResult"
+        "204":
+          description: Access reset — credentials cleared
         "404":
           description: Person not found
 
@@ -976,7 +972,7 @@ components:
 
     Person:
       type: object
-      required: [id, name, houseId, active, createdAt]
+      required: [id, name, houseId, active, activated, hasPin, createdAt]
       properties:
         id:
           type: integer
@@ -998,17 +994,19 @@ components:
           nullable: true
         active:
           type: boolean
+        activated:
+          type: boolean
+          description: True once the member has verified their email and chosen their own PIN
+        hasPin:
+          type: boolean
+          description: True if a PIN (admin-set or self-chosen) is currently set
+        email:
+          type: string
+          nullable: true
+          description: Email address registered during activation
         createdAt:
           type: string
           format: date-time
-
-    PersonPinResult:
-      type: object
-      required: [pin]
-      properties:
-        pin:
-          type: string
-          description: Plaintext PIN shown once
 
     PersonInput:
       type: object

@@ -47,7 +47,6 @@ export * from './member';
 export * from './memberBalance';
 export * from './person';
 export * from './personInput';
-export * from './personPinResult';
 export * from './sessionInput';
 export * from './sessionResult';
 export * from './settlement';

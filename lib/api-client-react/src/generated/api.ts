@@ -47,7 +47,6 @@ import type {
   Member,
   Person,
   PersonInput,
-  PersonPinResult,
   SessionInput,
   SessionResult,
   Settlement
@@ -753,11 +752,11 @@ export const getResetPersonPinUrl = (id: number,) => {
 }
 
 /**
- * @summary Generate or reset a person's personal PIN (host only)
+ * @summary Reset a person's access credentials (host only). Clears PIN, activation state, and pending OTP so the member must re-activate via email OTP.
  */
-export const resetPersonPin = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<PersonPinResult> => {
+export const resetPersonPin = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
 
-  return customFetch<PersonPinResult>(getResetPersonPinUrl(id),
+  return customFetch<void>(getResetPersonPinUrl(id),
   {
     ...options,
     method: 'POST'
@@ -802,7 +801,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ResetPersonPinMutationError = ErrorType<void>
 
     /**
- * @summary Generate or reset a person's personal PIN (host only)
+ * @summary Reset a person's access credentials (host only). Clears PIN, activation state, and pending OTP so the member must re-activate via email OTP.
  */
 export const useResetPersonPin = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetPersonPin>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -3,8 +3,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { peopleTable, housesTable } from "@workspace/db";
 import { requireHost } from "../lib/host-auth";
-import { generatePin } from "../lib/token";
-import { hashPin } from "../lib/pin-hash";
 
 const router: IRouter = Router();
 
@@ -20,6 +18,8 @@ router.get("/people", async (req, res): Promise<void> => {
       houseAccentColor: housesTable.accentColor,
       avatar: peopleTable.avatar,
       active: peopleTable.active,
+      activated: peopleTable.activated,
+      email: peopleTable.email,
       hasPin: peopleTable.personalPinHash,
       createdAt: peopleTable.createdAt,
     })
@@ -117,11 +117,13 @@ router.patch("/people/:id", requireHost, async (req, res): Promise<void> => {
 });
 
 /**
- * POST /people/:id/pin — generate (or reset) a person's personal PIN (host only).
+ * POST /people/:id/pin — reset a person's access credentials (host only).
  *
- * Generates a new cryptographically secure 4-digit PIN, hashes it with scrypt,
- * and stores the hash on the person record. Returns the plaintext PIN **once** —
- * it is never stored or returned again.
+ * Clears the PIN hash, activation state, and any pending OTP, returning the
+ * member to the same state as a newly created directory entry. They must
+ * re-activate via the email OTP flow to choose a new PIN.
+ *
+ * Does NOT delete the person, their event memberships, expenses, or any history.
  */
 router.post("/people/:id/pin", requireHost, async (req, res): Promise<void> => {
   const rawId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -133,18 +135,19 @@ router.post("/people/:id/pin", requireHost, async (req, res): Promise<void> => {
     return;
   }
 
-  const pin = generatePin();
-  const pinHash = hashPin(pin);
-
-  // Setting a PIN via admin also marks the person as activated (admin vouches for identity).
-  // This allows admin-assigned PINs to work for login without requiring the email OTP flow.
+  // Clear all authentication credentials — PIN hash, activation flag, and any
+  // pending OTP. Email is retained so the member can re-activate immediately.
   await db
     .update(peopleTable)
-    .set({ personalPinHash: pinHash, activated: true })
+    .set({
+      personalPinHash: null,
+      activated: false,
+      emailOtpHash: null,
+      emailOtpExpiresAt: null,
+    })
     .where(eq(peopleTable.id, id));
 
-  // Return plaintext once — host must share it with the person
-  res.json({ pin });
+  res.sendStatus(204);
 });
 
 /** DELETE /people/:id — delete a person (host only) */

@@ -138,6 +138,9 @@ export const ListPeopleResponseItem = zod.object({
   "houseAccentColor": zod.string().nullish(),
   "avatar": zod.string().nullish(),
   "active": zod.boolean(),
+  "activated": zod.boolean().describe('True once the member has verified their email and chosen their own PIN'),
+  "hasPin": zod.boolean().describe('True if a PIN (admin-set or self-chosen) is currently set'),
+  "email": zod.string().nullish().describe('Email address registered during activation'),
   "createdAt": zod.coerce.date()
 })
 export const ListPeopleResponse = zod.array(ListPeopleResponseItem)
@@ -170,12 +173,15 @@ export const CreatePersonResponse = zod.object({
   "houseAccentColor": zod.string().nullish(),
   "avatar": zod.string().nullish(),
   "active": zod.boolean(),
+  "activated": zod.boolean().describe('True once the member has verified their email and chosen their own PIN'),
+  "hasPin": zod.boolean().describe('True if a PIN (admin-set or self-chosen) is currently set'),
+  "email": zod.string().nullish().describe('Email address registered during activation'),
   "createdAt": zod.coerce.date()
 })
 
 
 /**
- * @summary Generate or reset a person's personal PIN (host only)
+ * @summary Reset a person's access credentials (host only). Clears PIN, activation state, and pending OTP so the member must re-activate via email OTP.
  */
 export const ResetPersonPinParams = zod.object({
   "id": zod.coerce.number().int()
@@ -185,9 +191,7 @@ export const ResetPersonPinHeader = zod.object({
   "x-host-token": zod.string()
 })
 
-export const ResetPersonPinResponse = zod.object({
-  "pin": zod.string().describe('Plaintext PIN shown once')
-})
+export const ResetPersonPinResponse = zod.void()
 
 
 /**
@@ -221,6 +225,9 @@ export const UpdatePersonResponse = zod.object({
   "houseAccentColor": zod.string().nullish(),
   "avatar": zod.string().nullish(),
   "active": zod.boolean(),
+  "activated": zod.boolean().describe('True once the member has verified their email and chosen their own PIN'),
+  "hasPin": zod.boolean().describe('True if a PIN (admin-set or self-chosen) is currently set'),
+  "email": zod.string().nullish().describe('Email address registered during activation'),
   "createdAt": zod.coerce.date()
 })
 
