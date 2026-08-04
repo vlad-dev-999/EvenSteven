@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { CREST_OPTIONS, getCrestEmoji } from '@/lib/crest-options';
 import { useLocation } from 'wouter';
 import { toast } from 'sonner';
 import {
@@ -40,16 +41,6 @@ import { useThemeContext } from '@/themes/context';
 import { THEMES, THEME_LABELS, MODE_LABELS, MODE_DESCRIPTIONS } from '@/themes/index';
 import type { ThemeMode } from '@/themes/index';
 
-const CREST_OPTIONS = [
-  { value: 'home', label: '🏠' },
-  { value: 'star', label: '⭐' },
-  { value: 'leaf', label: '🍃' },
-  { value: 'sun', label: '☀️' },
-  { value: 'moon', label: '🌙' },
-  { value: 'mountain', label: '⛰️' },
-  { value: 'wave', label: '🌊' },
-  { value: 'flame', label: '🔥' },
-];
 
 // Curated avatar emoji — covers a wide range of personalities without relying on images
 const AVATAR_OPTIONS = [
@@ -69,9 +60,6 @@ const ACCENT_OPTIONS = [
   '#8B4513', '#2F6B3F', '#1a3a5c', '#8B6914', '#5c2a8a', '#8B1a1a', '#2a5c8B', '#3d6b4f',
 ];
 
-function getCrestEmoji(crest: string) {
-  return CREST_OPTIONS.find(c => c.value === crest)?.label ?? '🏠';
-}
 
 // ─── Houses Tab ────────────────────────────────────────────────────────────────
 function HousesTab({ hostToken }: { hostToken: string }) {

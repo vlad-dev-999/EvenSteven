@@ -4,6 +4,7 @@
  * If person is not yet activated → redirect to /activate
  */
 import { useState, useEffect } from 'react';
+import { getCrestEmoji } from '@/lib/crest-options';
 import { useLocation, useSearch } from 'wouter';
 import { toast } from 'sonner';
 import { usePersonSession } from '@/hooks/use-person-session';
@@ -201,13 +202,7 @@ export default function LoginPage() {
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-lg" aria-hidden>
-                        {house.crest === 'star' ? '⭐' :
-                         house.crest === 'leaf' ? '🍃' :
-                         house.crest === 'sun' ? '☀️' :
-                         house.crest === 'moon' ? '🌙' :
-                         house.crest === 'mountain' ? '⛰️' :
-                         house.crest === 'wave' ? '🌊' :
-                         house.crest === 'flame' ? '🔥' : '🏠'}
+                        {getCrestEmoji(house.crest)}
                       </span>
                       <span className="font-medium text-foreground">{house.name}</span>
                       <span className="text-xs text-muted-foreground">
