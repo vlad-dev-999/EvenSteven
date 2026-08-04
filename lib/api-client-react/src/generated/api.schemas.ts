@@ -48,6 +48,7 @@ export interface Person {
   houseCrest?: string | null;
   houseAccentColor?: string | null;
   avatar?: string | null;
+  personalColor?: string | null;
   active: boolean;
   createdAt: string;
 }
@@ -65,6 +66,7 @@ export interface PersonInput {
   name: string;
   houseId: number;
   avatar?: string | null;
+  personalColor?: string | null;
   active?: boolean;
 }
 

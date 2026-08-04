@@ -7,7 +7,8 @@ export const peopleTable = pgTable("people", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   houseId: integer("house_id").notNull().references(() => housesTable.id, { onDelete: "restrict" }),
-  avatar: text("avatar"), // optional emoji or initials override
+  avatar: text("avatar"),         // optional emoji or initials override
+  personalColor: text("personal_color"), // optional curated accent hex colour
   active: boolean("active").notNull().default(true),
   // Activation — true once the member has verified their email and chosen their own PIN
   activated: boolean("activated").notNull().default(false),
