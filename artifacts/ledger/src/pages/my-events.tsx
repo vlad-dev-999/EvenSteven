@@ -152,7 +152,7 @@ export default function MyEventsPage() {
                   key={ev.id}
                   className={cn(
                     'w-full text-left rounded-xl border border-border bg-card px-5 py-4 hover:bg-muted/30 transition-colors space-y-1',
-                    ev.frozen && 'opacity-70',
+                    ev.frozen ? 'event-card-closed' : 'event-card-active',
                   )}
                   onClick={() => handleEnterEvent(ev)}
                 >

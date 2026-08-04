@@ -761,6 +761,74 @@ html.reduce-effects body {
   }
 }
 
+/* ─── Event card visual states ─────────────────────────────────────────────────
+   Active:  one slow diagonal glass sheen every ~16 s, long rest between passes.
+            Luxury watch — not gaming RGB.
+   Closed:  warm paper/archive aesthetic — "This evening is complete."
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Active card — contains the sheen pseudo-element */
+.event-card-active {
+  position: relative;
+  overflow: hidden;
+}
+
+.event-card-active::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* Narrow diagonal highlight — barely there, glass-reflection feel */
+  background: linear-gradient(
+    108deg,
+    transparent           20%,
+    hsl(0 0% 100% / 0.00) 38%,
+    hsl(0 0% 100% / 0.05) 48%,
+    hsl(0 0% 100% / 0.07) 50%,
+    hsl(0 0% 100% / 0.05) 52%,
+    hsl(0 0% 100% / 0.00) 62%,
+    transparent           80%
+  );
+  pointer-events: none;
+  /* Parked off-screen left until animation fires */
+  transform: translateX(-160%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .event-card-active::before {
+    /* 7 % of 16 s ≈ 1.1 s sweep; remaining 93 % ≈ 14.9 s rest */
+    animation: event-card-sheen 16s ease-in-out infinite;
+    will-change: transform;
+  }
+}
+
+@keyframes event-card-sheen {
+  0%   { transform: translateX(-160%); }
+  7%   { transform: translateX( 160%); }
+  100% { transform: translateX( 160%); }
+}
+
+/* Closed card — subtle desaturation + warm matte vignette overlay */
+.event-card-closed {
+  position: relative;
+  filter: saturate(0.68) contrast(0.94);
+}
+
+.event-card-closed::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  /* Warm aged-vellum tint — top to bottom gradient, very low opacity */
+  background: linear-gradient(
+    180deg,
+    hsl(35 20% 80% / 0.07) 0%,
+    transparent            50%,
+    hsl(35 15% 60% / 0.05) 100%
+  );
+  pointer-events: none;
+}
+
 /* ─── Smooth theme transition ──────────────────────────────────────────────── */
 html {
   transition:

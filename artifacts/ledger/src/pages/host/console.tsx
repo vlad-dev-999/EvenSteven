@@ -816,7 +816,7 @@ function EventsTab({ hostToken }: { hostToken: string }) {
       ) : (
         <div className="space-y-2">
           {(events as any[]).map(ev => (
-            <div key={ev.id} className={cn('rounded-lg border border-border bg-card px-4 py-3 space-y-2', ev.archived && 'opacity-60')}>
+            <div key={ev.id} className={cn('rounded-lg border border-border bg-card px-4 py-3 space-y-2', ev.archived ? 'opacity-60' : ev.frozen ? 'event-card-closed' : 'event-card-active')}>
               <div className="flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground truncate">{ev.name}</p>
