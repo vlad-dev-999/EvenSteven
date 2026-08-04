@@ -21,6 +21,8 @@ export type ThemeMode = 'classic' | 'seasonal' | 'weather' | 'manual';
 export interface ThemeSettings {
   mode: ThemeMode;
   manualTheme: Theme;
+  subtleMotion: boolean;
+  highlightIcon: string;
 }
 
 export const THEME_LABELS: Record<Theme, string> = {
@@ -54,6 +56,8 @@ const STORAGE_KEY = 'evensteven-theme-v1';
 export const DEFAULT_SETTINGS: ThemeSettings = {
   mode: 'classic',
   manualTheme: 'classic',
+  subtleMotion: false,
+  highlightIcon: '⭐',
 };
 
 export function loadThemeSettings(): ThemeSettings {
@@ -62,8 +66,10 @@ export function loadThemeSettings(): ThemeSettings {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<ThemeSettings>;
       return {
-        mode: parsed.mode ?? DEFAULT_SETTINGS.mode,
-        manualTheme: parsed.manualTheme ?? DEFAULT_SETTINGS.manualTheme,
+        mode:          parsed.mode          ?? DEFAULT_SETTINGS.mode,
+        manualTheme:   parsed.manualTheme   ?? DEFAULT_SETTINGS.manualTheme,
+        subtleMotion:  parsed.subtleMotion  ?? DEFAULT_SETTINGS.subtleMotion,
+        highlightIcon: parsed.highlightIcon ?? DEFAULT_SETTINGS.highlightIcon,
       };
     }
   } catch { /* ignore */ }

@@ -51,6 +51,20 @@ const CREST_OPTIONS = [
   { value: 'flame', label: '🔥' },
 ];
 
+// Curated avatar emoji — covers a wide range of personalities without relying on images
+const AVATAR_OPTIONS = [
+  '🦁', '🐺', '🦊', '🐻', '🦅', '🦋',
+  '🌙', '⭐', '🔥', '💎', '🌊', '🍃',
+  '⚡', '🎯', '🎭', '🏆', '👑', '🗡️',
+  '🛡️', '🌺', '🍂', '❄️', '🌟', '🎪',
+];
+
+// Curated icons for the Evening Highlight feature
+const HIGHLIGHT_ICON_OPTIONS = [
+  '⭐', '🌟', '👑', '🏆', '🥇', '🔥',
+  '💎', '⚡', '🎯', '🦁', '🌙', '✨',
+];
+
 const ACCENT_OPTIONS = [
   '#8B4513', '#2F6B3F', '#1a3a5c', '#8B6914', '#5c2a8a', '#8B1a1a', '#2a5c8B', '#3d6b4f',
 ];
@@ -296,14 +310,25 @@ function PeopleTab({ hostToken }: { hostToken: string }) {
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label>Avatar <span className="text-muted-foreground font-normal">(emoji or initials)</span></Label>
-              <Input
-                value={form.avatar}
-                onChange={e => setForm(f => ({ ...f, avatar: e.target.value }))}
-                placeholder="e.g. 🦇 or VK"
-                maxLength={4}
-              />
-              <p className="text-xs text-muted-foreground">Optional. Shown on member cards.</p>
+              <Label>Avatar <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <div className="flex flex-wrap gap-1.5">
+                {AVATAR_OPTIONS.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, avatar: f.avatar === emoji ? '' : emoji }))}
+                    className={cn(
+                      'text-xl p-1.5 rounded-lg border-2 transition-colors leading-none',
+                      form.avatar === emoji
+                        ? 'border-accent bg-accent/10'
+                        : 'border-transparent hover:border-border',
+                    )}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">Tap to select · tap again to clear. Shown on member cards.</p>
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="active" checked={form.active} onChange={e => setForm(f => ({ ...f, active: e.target.checked }))} className="rounded" />
@@ -1076,6 +1101,62 @@ function AppearanceSection() {
           </div>
         </div>
       )}
+
+      {/* Subtle Motion toggle */}
+      <div className="rounded-xl border border-border bg-card px-5 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-foreground">Subtle Motion</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+              Gentle hover lifts and card responses. Never sounds.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={settings.subtleMotion}
+            onClick={() => updateSettings({ ...settings, subtleMotion: !settings.subtleMotion })}
+            className={cn(
+              'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors',
+              settings.subtleMotion ? 'bg-primary' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform',
+                settings.subtleMotion ? 'translate-x-5' : 'translate-x-0',
+              )}
+            />
+          </button>
+        </div>
+      </div>
+
+      {/* Evening Highlight icon picker */}
+      <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">Evening Highlight</p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+            Icon shown beside the top contributor on the balances screen.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {HIGHLIGHT_ICON_OPTIONS.map(icon => (
+            <button
+              key={icon}
+              type="button"
+              onClick={() => updateSettings({ ...settings, highlightIcon: icon })}
+              className={cn(
+                'text-xl p-2 rounded-lg border-2 transition-colors leading-none',
+                settings.highlightIcon === icon
+                  ? 'border-accent bg-accent/10'
+                  : 'border-transparent hover:border-border',
+              )}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Active theme indicator */}
       <p className="text-xs text-muted-foreground text-center">

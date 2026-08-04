@@ -6,6 +6,7 @@ import { useLocalSession } from '@/hooks/use-local-session';
 import { formatCurrency } from '@/lib/utils';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useThemeContext } from '@/themes/context';
 
 type SettlementMode = 'individual' | 'house';
 
@@ -23,6 +24,7 @@ export default function SettlementsPage() {
   const [, setLocation] = useLocation();
   const { session } = useLocalSession(token ?? '');
   const [mode, setMode] = useState<SettlementMode>('individual');
+  const { settings } = useThemeContext();
 
   const { data: event } = useGetEvent(token ?? '', {
     query: { enabled: !!token } as any,
@@ -174,26 +176,41 @@ export default function SettlementsPage() {
         )}
 
         {/* Balances detail */}
-        {(balancesData?.memberBalances.length ?? 0) > 0 && (
-          <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              {mode === 'house' ? 'Individual Balances' : 'All Balances'}
-            </h3>
-            <div className="space-y-2">
-              {balancesData!.memberBalances
-                .sort((a, b) => b.netBalance - a.netBalance)
-                .map(mb => (
+        {(balancesData?.memberBalances.length ?? 0) > 0 && (() => {
+          const sorted = [...balancesData!.memberBalances].sort((a, b) => b.netBalance - a.netBalance);
+          const top = sorted[0];
+          // Only show highlight if: top has positive balance AND it's not a tie
+          const showHighlight = (mb: typeof top) =>
+            settings.highlightIcon &&
+            top.netBalance > 0 &&
+            mb.memberId === top.memberId &&
+            (sorted.length < 2 || sorted[1].netBalance !== top.netBalance);
+
+          return (
+            <section className="space-y-3">
+              <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                {mode === 'house' ? 'Individual Balances' : 'All Balances'}
+              </h3>
+              <div className="space-y-2">
+                {sorted.map(mb => (
                   <div key={mb.memberId} className="flex items-center justify-between rounded-lg border border-border bg-card px-4 py-2.5">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {mb.memberName}
-                        {mb.memberId === session.memberId && (
-                          <span className="ml-1.5 text-xs text-muted-foreground font-normal">you</span>
-                        )}
-                      </p>
-                      {(mb as any).houseName && (
-                        <p className="text-xs text-muted-foreground">{(mb as any).houseName}</p>
+                    <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                      {showHighlight(mb) && (
+                        <span className="text-base leading-none select-none" aria-hidden="true">
+                          {settings.highlightIcon}
+                        </span>
                       )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {mb.memberName}
+                          {mb.memberId === session.memberId && (
+                            <span className="ml-1.5 text-xs text-muted-foreground font-normal">you</span>
+                          )}
+                        </p>
+                        {(mb as any).houseName && (
+                          <p className="text-xs text-muted-foreground">{(mb as any).houseName}</p>
+                        )}
+                      </div>
                     </div>
                     <p className={cn(
                       'text-sm font-semibold tabular-nums',
@@ -204,11 +221,11 @@ export default function SettlementsPage() {
                       {mb.netBalance > 0 ? '+' : ''}{formatCurrency(mb.netBalance)}
                     </p>
                   </div>
-                ))
-              }
-            </div>
-          </section>
-        )}
+                ))}
+              </div>
+            </section>
+          );
+        })()}
       </main>
     </div>
   );

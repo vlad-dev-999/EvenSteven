@@ -36,6 +36,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Apply / remove subtle-motion class whenever the setting changes
+  useEffect(() => {
+    const html = document.documentElement;
+    if (settings.subtleMotion) {
+      html.classList.add('motion-enabled');
+    } else {
+      html.classList.remove('motion-enabled');
+    }
+  }, [settings.subtleMotion]);
+
   // Resolve and apply theme whenever settings change
   useEffect(() => {
     let cancelled = false;

@@ -680,13 +680,38 @@ html[data-theme="storm"] body {
   100% { opacity: 0.5; transform: translate(-2%, 1%);   }
 }
 
-/* ─── Nautical — subtle horizon shimmer ─────────────────────────────────────── */
+/* ─── Nautical/Ocean — caustic light shimmer + horizon glow ─────────────────── */
 html[data-theme="nautical"] body {
   background-image: radial-gradient(
     ellipse 100% 40% at 50% 100%,
     hsl(210 50% 80% / 0.15) 0%,
     transparent 70%
   );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="nautical"]::before {
+    background:
+      radial-gradient(ellipse 22% 14% at 20% 38%, hsl(196 80% 78% / 0.07) 0%, transparent 100%),
+      radial-gradient(ellipse 16% 10% at 65% 52%, hsl(196 80% 78% / 0.055) 0%, transparent 100%),
+      radial-gradient(ellipse 28% 12% at 82% 28%, hsl(196 80% 78% / 0.045) 0%, transparent 100%);
+    animation: caustic-shift 14s ease-in-out infinite alternate;
+  }
+  html[data-theme="nautical"]::after {
+    background:
+      radial-gradient(ellipse 20% 16% at 42% 68%, hsl(196 80% 78% / 0.05) 0%, transparent 100%),
+      radial-gradient(ellipse 18% 12% at 12% 22%, hsl(196 80% 78% / 0.045) 0%, transparent 100%),
+      radial-gradient(ellipse 14% 18% at 58% 15%, hsl(196 80% 78% / 0.04) 0%, transparent 100%);
+    animation: caustic-shift 19s ease-in-out infinite alternate-reverse;
+    animation-delay: -6s;
+  }
+}
+
+@keyframes caustic-shift {
+  0%   { opacity: 0.55; transform: translate(0,    0)    scale(1);    }
+  30%  { opacity: 0.90; transform: translate(2%,   1%)   scale(1.04); }
+  65%  { opacity: 0.70; transform: translate(-1%,  2%)   scale(0.97); }
+  100% { opacity: 0.80; transform: translate(1%,  -1%)   scale(1.02); }
 }
 
 /* ─── Autumn — warm ember glow ──────────────────────────────────────────────── */
@@ -710,6 +735,29 @@ html.reduce-effects body {
   html[data-theme]::before,
   html[data-theme]::after {
     animation: none !important;
+  }
+}
+
+/* ─── Subtle Motion — premium micro-interactions ────────────────────────────
+   Enabled only when html.motion-enabled is present AND the user has not
+   requested reduced motion. Affects hover lift and card breathing only.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html.motion-enabled .bg-card {
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      background-color 0.4s ease;
+  }
+  html.motion-enabled .bg-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px hsl(var(--foreground) / 0.06);
+  }
+  /* Ripple feedback on interactive card-like buttons */
+  html.motion-enabled button.bg-card:active,
+  html.motion-enabled button.bg-background:active {
+    transform: scale(0.985);
+    transition: transform 0.08s ease;
   }
 }
 
