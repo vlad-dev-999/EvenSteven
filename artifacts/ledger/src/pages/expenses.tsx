@@ -66,7 +66,7 @@ export default function ExpensesPage() {
         {total > 0 && (
           <div className="rounded-xl border border-border bg-card px-5 py-4">
             <p className="text-xs text-muted-foreground uppercase tracking-widest font-medium mb-1">Total spent</p>
-            <p className="font-display text-4xl text-foreground">{formatCurrency(total)}</p>
+            <p className="font-display text-3xl sm:text-4xl text-foreground">{formatCurrency(total)}</p>
           </div>
         )}
 

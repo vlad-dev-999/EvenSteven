@@ -405,17 +405,17 @@ export default function DashboardPage() {
         )}>
           {netBalance === 0 ? (
             <>
-              <p className="font-display text-3xl text-foreground">You're even.</p>
+              <p className="font-display text-2xl sm:text-3xl text-foreground">You're even.</p>
               <p className="text-sm text-muted-foreground">No balance to settle.</p>
             </>
           ) : netBalance > 0 ? (
             <>
-              <p className="font-display text-3xl text-green-700">You're owed {formatCurrency(netBalance)}.</p>
+              <p className="font-display text-2xl sm:text-3xl text-green-700 break-words">You're owed {formatCurrency(netBalance)}.</p>
               <p className="text-sm text-muted-foreground">Others will settle with you.</p>
             </>
           ) : (
             <>
-              <p className="font-display text-3xl text-amber-700">You owe {formatCurrency(Math.abs(netBalance))}.</p>
+              <p className="font-display text-2xl sm:text-3xl text-amber-700 break-words">You owe {formatCurrency(Math.abs(netBalance))}.</p>
               <p className="text-sm text-muted-foreground">
                 <Link href={`/e/${token}/settlements`} className="underline underline-offset-2 hover:text-foreground transition-colors">
                   See settlement plan →

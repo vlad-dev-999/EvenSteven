@@ -30,8 +30,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn, formatCurrency } from '@/lib/utils';
-import { ArrowRight, Users, TrendingUp, CheckCircle, KeyRound } from 'lucide-react';
+import { ArrowRight, Users, TrendingUp, CheckCircle, KeyRound, MoreHorizontal } from 'lucide-react';
 
 const CREST_OPTIONS = [
   { value: 'home', label: '🏠' },
@@ -440,15 +444,15 @@ function EventOverview({ eventToken, hostToken }: { eventToken: string; hostToke
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {[
           { icon: <Users size={14} />, label: 'Members', value: `${claimed.length}/${approved.length}` },
           { icon: <TrendingUp size={14} />, label: 'Total Spent', value: formatCurrency(summary?.totalExpenses ?? 0) },
           { icon: <CheckCircle size={14} />, label: 'Settlements', value: String((settlements as any[]).length) },
         ].map((stat, i) => (
-          <div key={i} className="rounded-xl border border-border bg-card px-4 py-3 space-y-1">
-            <div className="flex items-center gap-1.5 text-muted-foreground">{stat.icon}<span className="text-xs">{stat.label}</span></div>
-            <p className="font-display text-2xl text-foreground">{stat.value}</p>
+          <div key={i} className="rounded-xl border border-border bg-card px-2 sm:px-4 py-3 space-y-1 min-w-0">
+            <div className="flex items-center gap-1.5 text-muted-foreground">{stat.icon}<span className="text-xs truncate">{stat.label}</span></div>
+            <p className="font-display text-lg sm:text-2xl text-foreground truncate">{stat.value}</p>
           </div>
         ))}
       </div>
@@ -825,7 +829,55 @@ function EventsTab({ hostToken }: { hostToken: string }) {
                     {ev.archived ? 'Archived' : ev.frozen ? 'Closed' : 'Open'}
                   </p>
                 </div>
-                <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
+                {/* Mobile: primary action + overflow menu */}
+                <div className="flex sm:hidden items-center gap-1.5 shrink-0">
+                  {!ev.archived && (
+                    <Button size="sm" variant="outline" onClick={() => setLocation(`/e/${ev.token}/dashboard`)}>Open</Button>
+                  )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" variant="ghost" className="px-2">
+                        <MoreHorizontal size={16} />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="min-w-36">
+                      {!ev.archived && (
+                        <>
+                          <DropdownMenuItem onClick={() => setShowDetailsDialog(showDetailsDialog === ev.token ? null : ev.token)}>
+                            Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setShowOverviewToken(showOverviewToken === ev.token ? null : ev.token)}>
+                            {showOverviewToken === ev.token ? 'Close Overview' : 'Overview'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleToggleFreeze(ev)}
+                            disabled={toggling === ev.token}
+                            className={ev.frozen ? 'text-green-700 focus:text-green-700' : ''}
+                          >
+                            {toggling === ev.token ? '…' : ev.frozen ? 'Unfreeze' : 'Freeze'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleArchive(ev)}
+                            disabled={archiving === ev.token}
+                          >
+                            Archive
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
+                      )}
+                      <DropdownMenuItem
+                        onClick={() => handleDelete(ev)}
+                        disabled={deleting === ev.token}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Desktop: full button row */}
+                <div className="hidden sm:flex gap-1.5 shrink-0 flex-wrap justify-end">
                   {!ev.archived && (
                     <>
                       <Button size="sm" variant="ghost" onClick={() => setShowDetailsDialog(showDetailsDialog === ev.token ? null : ev.token)}>

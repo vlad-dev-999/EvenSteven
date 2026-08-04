@@ -1,3 +1,4 @@
 - [Directory-based identity model](directory-identity.md) — PIN and identity moved from event-scope (members) to directory-scope (people); no self-registration.
 - [RC1 env + DB setup](rc1-env-db.md) — DATABASE_URL is Replit runtime-managed (never set manually); HOST_PASSWORD is a required secret for the API server startup.
 - [House grouping fix](house-grouping-fix.md) — "Split by House" must use members.houseId (not familyId); splitType='families' enum kept, only the grouping key changed.
+- [Lib build requirement](lib-build-requirement.md) — Run tsc --build on lib/api-client-react, lib/db, lib/api-zod before typechecking; no build scripts, must use npx tsc --build directly.
