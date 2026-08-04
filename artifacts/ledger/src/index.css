@@ -160,3 +160,567 @@ body {
 ::-webkit-scrollbar-track { background: hsl(var(--background)); }
 ::-webkit-scrollbar-thumb { background: hsl(var(--muted)); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   THEME OVERRIDES
+   Each block only overrides CSS tokens — no layout, spacing or typography.
+   Adding a new theme = one [data-theme="name"] block here + register the key
+   in src/themes/index.ts.
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Nautical ──────────────────────────────────────────────────────────────────
+   Deep navy hulls, rope-canvas surfaces, brass fittings, sea-glass accents.     */
+[data-theme="nautical"] {
+  --background:          210 38% 96%;
+  --foreground:          218 45% 16%;
+
+  --border:              210 28% 84%;
+  --input:               210 28% 91%;
+  --ring:                185 52% 42%;
+
+  --card:                210 50% 99%;
+  --card-foreground:     218 45% 16%;
+  --card-border:         210 28% 87%;
+
+  --popover:             210 50% 99%;
+  --popover-foreground:  218 45% 16%;
+  --popover-border:      210 28% 87%;
+
+  --primary:             218 68% 26%;
+  --primary-foreground:  210 45% 97%;
+
+  --secondary:           210 32% 88%;
+  --secondary-foreground:218 45% 20%;
+
+  --muted:               210 24% 85%;
+  --muted-foreground:    218 20% 46%;
+  --muted-border:        hsl(210, 20%, 82%);
+
+  --accent:              185 52% 38%;
+  --accent-foreground:   210 45% 97%;
+  --accent-border:       hsl(185, 38%, 68%);
+
+  --destructive:         0 60% 50%;
+  --destructive-foreground: 210 45% 97%;
+  --destructive-border:  hsl(0, 50%, 80%);
+}
+
+/* ─── Spring ────────────────────────────────────────────────────────────────────
+   Fresh growth, morning dew, first blossoms, apple-green light.                */
+[data-theme="spring"] {
+  --background:          108 30% 97%;
+  --foreground:          148 42% 14%;
+
+  --border:              108 22% 85%;
+  --input:               108 22% 92%;
+  --ring:                340 55% 55%;
+
+  --card:                0 0% 100%;
+  --card-foreground:     148 42% 14%;
+  --card-border:         108 22% 88%;
+
+  --popover:             0 0% 100%;
+  --popover-foreground:  148 42% 14%;
+  --popover-border:      108 22% 88%;
+
+  --primary:             148 55% 30%;
+  --primary-foreground:  108 35% 98%;
+
+  --secondary:           108 22% 90%;
+  --secondary-foreground:148 42% 18%;
+
+  --muted:               108 18% 87%;
+  --muted-foreground:    148 16% 46%;
+  --muted-border:        hsl(108, 14%, 84%);
+
+  --accent:              340 55% 55%;
+  --accent-foreground:   0 0% 100%;
+  --accent-border:       hsl(340, 42%, 78%);
+
+  --destructive:         0 60% 50%;
+  --destructive-foreground: 0 0% 100%;
+  --destructive-border:  hsl(0, 50%, 80%);
+}
+
+/* ─── Summer ────────────────────────────────────────────────────────────────────
+   Azure water, warm sand, sunlit afternoons, open sky.                         */
+[data-theme="summer"] {
+  --background:          46 52% 96%;
+  --foreground:          216 48% 17%;
+
+  --border:              46 35% 83%;
+  --input:               46 35% 91%;
+  --ring:                36 82% 52%;
+
+  --card:                46 45% 99%;
+  --card-foreground:     216 48% 17%;
+  --card-border:         46 35% 86%;
+
+  --popover:             46 45% 99%;
+  --popover-foreground:  216 48% 17%;
+  --popover-border:      46 35% 86%;
+
+  --primary:             213 72% 36%;
+  --primary-foreground:  46 50% 98%;
+
+  --secondary:           46 32% 89%;
+  --secondary-foreground:216 48% 20%;
+
+  --muted:               46 24% 86%;
+  --muted-foreground:    216 20% 46%;
+  --muted-border:        hsl(46, 20%, 83%);
+
+  --accent:              36 82% 50%;
+  --accent-foreground:   46 50% 98%;
+  --accent-border:       hsl(36, 65%, 76%);
+
+  --destructive:         0 60% 50%;
+  --destructive-foreground: 46 50% 98%;
+  --destructive-border:  hsl(0, 50%, 80%);
+}
+
+/* ─── Autumn ────────────────────────────────────────────────────────────────────
+   Fallen walnut, deep copper, muted maple, harvest smoke.                      */
+[data-theme="autumn"] {
+  --background:          24 38% 92%;
+  --foreground:          22 45% 17%;
+
+  --border:              24 28% 80%;
+  --input:               24 28% 88%;
+  --ring:                22 72% 42%;
+
+  --card:                26 42% 97%;
+  --card-foreground:     22 45% 17%;
+  --card-border:         24 28% 83%;
+
+  --popover:             26 42% 97%;
+  --popover-foreground:  22 45% 17%;
+  --popover-border:      24 28% 83%;
+
+  --primary:             22 55% 26%;
+  --primary-foreground:  26 40% 97%;
+
+  --secondary:           24 28% 85%;
+  --secondary-foreground:22 45% 20%;
+
+  --muted:               24 22% 82%;
+  --muted-foreground:    22 18% 46%;
+  --muted-border:        hsl(24, 18%, 78%);
+
+  --accent:              22 72% 40%;
+  --accent-foreground:   26 40% 97%;
+  --accent-border:       hsl(22, 55%, 68%);
+
+  --destructive:         0 60% 48%;
+  --destructive-foreground: 26 40% 97%;
+  --destructive-border:  hsl(0, 48%, 78%);
+}
+
+/* ─── Christmas ─────────────────────────────────────────────────────────────────
+   Rich oxblood reds, evergreen depths, warm brass highlights. Dignified.       */
+[data-theme="christmas"] {
+  --background:          355 28% 10%;
+  --foreground:          34 28% 90%;
+
+  --border:              355 20% 21%;
+  --input:               355 18% 17%;
+  --ring:                38 62% 44%;
+
+  --card:                355 24% 14%;
+  --card-foreground:     34 28% 90%;
+  --card-border:         355 18% 19%;
+
+  --popover:             355 24% 14%;
+  --popover-foreground:  34 28% 90%;
+  --popover-border:      355 18% 19%;
+
+  --primary:             0 64% 40%;
+  --primary-foreground:  34 32% 96%;
+
+  --secondary:           355 18% 19%;
+  --secondary-foreground:34 28% 84%;
+
+  --muted:               355 14% 22%;
+  --muted-foreground:    34 12% 58%;
+  --muted-border:        hsl(355, 12%, 19%);
+
+  --accent:              145 48% 34%;
+  --accent-foreground:   34 32% 96%;
+  --accent-border:       hsl(145, 35%, 27%);
+
+  --destructive:         0 72% 48%;
+  --destructive-foreground: 34 32% 96%;
+  --destructive-border:  hsl(0, 55%, 30%);
+}
+
+/* ─── Rain ──────────────────────────────────────────────────────────────────────
+   Cool slate blues, misted glass surfaces, soft reflections.                   */
+[data-theme="rain"] {
+  --background:          212 24% 92%;
+  --foreground:          220 30% 20%;
+
+  --border:              212 18% 82%;
+  --input:               212 18% 90%;
+  --ring:                198 48% 42%;
+
+  --card:                210 30% 97%;
+  --card-foreground:     220 30% 20%;
+  --card-border:         212 18% 85%;
+
+  --popover:             210 30% 97%;
+  --popover-foreground:  220 30% 20%;
+  --popover-border:      212 18% 85%;
+
+  --primary:             220 42% 30%;
+  --primary-foreground:  212 30% 97%;
+
+  --secondary:           212 18% 86%;
+  --secondary-foreground:220 30% 24%;
+
+  --muted:               212 14% 83%;
+  --muted-foreground:    220 16% 48%;
+  --muted-border:        hsl(212, 12%, 80%);
+
+  --accent:              198 48% 40%;
+  --accent-foreground:   212 30% 97%;
+  --accent-border:       hsl(198, 35%, 68%);
+
+  --destructive:         0 60% 50%;
+  --destructive-foreground: 212 30% 97%;
+  --destructive-border:  hsl(0, 50%, 80%);
+}
+
+/* ─── Storm ─────────────────────────────────────────────────────────────────────
+   Dark slate, restrained drama, no flashing effects.                           */
+[data-theme="storm"] {
+  --background:          222 24% 11%;
+  --foreground:          218 24% 84%;
+
+  --border:              222 18% 21%;
+  --input:               222 16% 17%;
+  --ring:                198 60% 46%;
+
+  --card:                220 22% 15%;
+  --card-foreground:     218 24% 84%;
+  --card-border:         222 18% 19%;
+
+  --popover:             220 22% 15%;
+  --popover-foreground:  218 24% 84%;
+  --popover-border:      222 18% 19%;
+
+  --primary:             224 38% 48%;
+  --primary-foreground:  222 24% 96%;
+
+  --secondary:           222 18% 20%;
+  --secondary-foreground:218 24% 78%;
+
+  --muted:               222 14% 24%;
+  --muted-foreground:    218 16% 56%;
+  --muted-border:        hsl(222, 12%, 21%);
+
+  --accent:              198 60% 46%;
+  --accent-foreground:   222 24% 96%;
+  --accent-border:       hsl(198, 45%, 32%);
+
+  --destructive:         0 68% 52%;
+  --destructive-foreground: 222 24% 96%;
+  --destructive-border:  hsl(0, 52%, 32%);
+}
+
+/* ─── Night Sky ─────────────────────────────────────────────────────────────────
+   Deep navy cosmos, distant stars, soft periwinkle, cyan glow.                */
+[data-theme="night-sky"] {
+  --background:          238 45% 8%;
+  --foreground:          230 32% 88%;
+
+  --border:              238 30% 18%;
+  --input:               238 28% 14%;
+  --ring:                192 82% 52%;
+
+  --card:                238 40% 12%;
+  --card-foreground:     230 32% 88%;
+  --card-border:         238 28% 16%;
+
+  --popover:             238 40% 12%;
+  --popover-foreground:  230 32% 88%;
+  --popover-border:      238 28% 16%;
+
+  --primary:             248 64% 68%;
+  --primary-foreground:  238 45% 8%;
+
+  --secondary:           238 30% 17%;
+  --secondary-foreground:230 32% 82%;
+
+  --muted:               238 24% 20%;
+  --muted-foreground:    230 20% 58%;
+  --muted-border:        hsl(238, 22%, 17%);
+
+  --accent:              192 82% 52%;
+  --accent-foreground:   238 45% 8%;
+  --accent-border:       hsl(192, 62%, 30%);
+
+  --destructive:         0 68% 55%;
+  --destructive-foreground: 238 45% 96%;
+  --destructive-border:  hsl(0, 52%, 30%);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   DECORATIVE ATMOSPHERIC EFFECTS
+   - Fixed position, behind the UI (z-index: 0), pointer-events: none
+   - GPU-friendly: only animates transform, opacity, background-position
+   - Disabled via prefers-reduced-motion OR html.reduce-effects (low-power)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Shared particle layer base ───────────────────────────────────────────── */
+html[data-theme]::before,
+html[data-theme]::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ─── Christmas — slow snowfall ─────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="christmas"]::before {
+    /* Snowflake particles via radial-gradient — 16 flakes at varied positions */
+    background-image:
+      radial-gradient(circle 1.5px at  8% 12%, rgba(255,255,255,0.85) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 22%  5%, rgba(255,255,255,0.70) 0%, transparent 100%),
+      radial-gradient(circle 2px   at 37% 18%, rgba(255,255,255,0.60) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 53%  8%, rgba(255,255,255,0.80) 0%, transparent 100%),
+      radial-gradient(circle 1.5px at 68% 22%, rgba(255,255,255,0.65) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 82%  4%, rgba(255,255,255,0.75) 0%, transparent 100%),
+      radial-gradient(circle 2px   at 93% 15%, rgba(255,255,255,0.55) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 15% 45%, rgba(255,255,255,0.70) 0%, transparent 100%),
+      radial-gradient(circle 1.5px at 44% 38%, rgba(255,255,255,0.60) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 72% 50%, rgba(255,255,255,0.80) 0%, transparent 100%),
+      radial-gradient(circle 2px   at 88% 42%, rgba(255,255,255,0.55) 0%, transparent 100%),
+      radial-gradient(circle 1px   at  5% 70%, rgba(255,255,255,0.65) 0%, transparent 100%),
+      radial-gradient(circle 1.5px at 29% 65%, rgba(255,255,255,0.75) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 58% 72%, rgba(255,255,255,0.60) 0%, transparent 100%),
+      radial-gradient(circle 2px   at 78% 68%, rgba(255,255,255,0.50) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 96% 75%, rgba(255,255,255,0.70) 0%, transparent 100%);
+    background-size: 100% 100%;
+    top: -100%;
+    height: 200%;
+    animation: snow-fall 28s linear infinite;
+    opacity: 0.7;
+  }
+  /* Staggered second layer for depth */
+  html[data-theme="christmas"]::after {
+    background-image:
+      radial-gradient(circle 1px   at 12% 30%, rgba(255,255,255,0.55) 0%, transparent 100%),
+      radial-gradient(circle 1.5px at 35% 55%, rgba(255,255,255,0.45) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 61% 28%, rgba(255,255,255,0.60) 0%, transparent 100%),
+      radial-gradient(circle 2px   at 84% 60%, rgba(255,255,255,0.40) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 48% 85%, rgba(255,255,255,0.55) 0%, transparent 100%),
+      radial-gradient(circle 1.5px at 19% 90%, rgba(255,255,255,0.50) 0%, transparent 100%),
+      radial-gradient(circle 1px   at 73% 88%, rgba(255,255,255,0.45) 0%, transparent 100%),
+      radial-gradient(circle 2px   at 91% 35%, rgba(255,255,255,0.40) 0%, transparent 100%);
+    background-size: 100% 100%;
+    top: -100%;
+    height: 200%;
+    animation: snow-fall 42s linear infinite;
+    animation-delay: -14s;
+    opacity: 0.5;
+  }
+}
+
+@keyframes snow-fall {
+  from { transform: translateY(0); }
+  to   { transform: translateY(50%); }
+}
+
+/* Warm vignette behind cards (always on, no motion) */
+html[data-theme="christmas"] body {
+  background-image: radial-gradient(
+    ellipse 80% 60% at 50% 100%,
+    hsl(0 45% 18% / 0.35) 0%,
+    transparent 70%
+  );
+}
+
+/* ─── Night Sky — twinkling starfield ──────────────────────────────────────── */
+html[data-theme="night-sky"]::before {
+  /* Starfield via box-shadow on a 1×1 pixel element */
+  width: 1px;
+  height: 1px;
+  background: transparent;
+  box-shadow:
+     82px  140px 0 0 rgba(255,255,255,0.85),
+    220px   55px 0 0 rgba(255,255,255,0.65),
+    510px  210px 0 1px rgba(255,255,255,0.75),
+    740px   38px 0 0 rgba(255,255,255,0.90),
+    960px  175px 0 0 rgba(255,255,255,0.55),
+   1180px   92px 0 1px rgba(255,255,255,0.80),
+   1320px  260px 0 0 rgba(255,255,255,0.60),
+    158px  310px 0 0 rgba(255,255,255,0.70),
+    390px  390px 0 1px rgba(255,255,255,0.45),
+    620px  330px 0 0 rgba(255,255,255,0.80),
+    855px  408px 0 0 rgba(255,255,255,0.55),
+   1050px  355px 0 1px rgba(255,255,255,0.70),
+   1260px  430px 0 0 rgba(255,255,255,0.50),
+     40px  480px 0 0 rgba(255,255,255,0.75),
+    275px  520px 0 0 rgba(255,255,255,0.60),
+    490px  550px 0 1px rgba(255,255,255,0.85),
+    705px  500px 0 0 rgba(255,255,255,0.45),
+    920px  560px 0 0 rgba(255,255,255,0.70),
+   1145px  490px 0 1px rgba(255,255,255,0.55),
+   1380px  570px 0 0 rgba(255,255,255,0.65),
+    130px   70px 0 1px rgba(180,200,255,0.60),
+    450px  120px 0 0 rgba(200,220,255,0.50),
+    680px   85px 0 1px rgba(180,200,255,0.70),
+    870px  155px 0 0 rgba(200,220,255,0.55),
+   1100px   45px 0 1px rgba(180,200,255,0.65);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="night-sky"]::before {
+    animation: star-twinkle 4.5s ease-in-out infinite alternate;
+  }
+  html[data-theme="night-sky"]::after {
+    width: 1px;
+    height: 1px;
+    background: transparent;
+    box-shadow:
+       55px  200px 0 0 rgba(255,255,255,0.40),
+      300px   28px 0 1px rgba(255,255,255,0.55),
+      575px  290px 0 0 rgba(255,255,255,0.35),
+      800px  115px 0 0 rgba(255,255,255,0.50),
+     1010px  370px 0 1px rgba(255,255,255,0.38),
+     1220px  200px 0 0 rgba(255,255,255,0.45),
+      185px  450px 0 0 rgba(255,255,255,0.42),
+      420px  510px 0 1px rgba(255,255,255,0.35),
+      650px  460px 0 0 rgba(255,255,255,0.50),
+      880px  530px 0 0 rgba(255,255,255,0.38);
+    animation: star-twinkle 6s ease-in-out infinite alternate;
+    animation-delay: -2.2s;
+  }
+}
+
+@keyframes star-twinkle {
+  0%   { opacity: 0.6; }
+  40%  { opacity: 1.0; }
+  70%  { opacity: 0.75; }
+  100% { opacity: 0.9; }
+}
+
+/* Subtle deep-space ambient glow */
+html[data-theme="night-sky"] body {
+  background-image:
+    radial-gradient(ellipse 60% 40% at 30% 20%, hsl(248 64% 25% / 0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 75% 60%, hsl(192 80% 20% / 0.12) 0%, transparent 70%);
+}
+
+/* ─── Rain — falling streaks ────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="rain"]::before {
+    background-image: repeating-linear-gradient(
+      168deg,
+      transparent,
+      transparent 42px,
+      rgba(160, 200, 225, 0.055) 42px,
+      rgba(160, 200, 225, 0.055) 43px
+    );
+    background-size: 70px 90px;
+    animation: rain-fall 1.1s linear infinite;
+    opacity: 0.9;
+  }
+  html[data-theme="rain"]::after {
+    background-image: repeating-linear-gradient(
+      168deg,
+      transparent,
+      transparent 28px,
+      rgba(140, 185, 215, 0.04) 28px,
+      rgba(140, 185, 215, 0.04) 29px
+    );
+    background-size: 50px 65px;
+    animation: rain-fall 1.6s linear infinite;
+    animation-delay: -0.6s;
+    opacity: 0.7;
+  }
+}
+
+@keyframes rain-fall {
+  from { background-position: 0 0; }
+  to   { background-position: -35px 90px; }
+}
+
+/* Cool misted glass ambient (always on) */
+html[data-theme="rain"] body {
+  background-image: radial-gradient(
+    ellipse 100% 50% at 50% 0%,
+    hsl(212 35% 80% / 0.22) 0%,
+    transparent 60%
+  );
+}
+
+/* ─── Storm — atmospheric vignette ─────────────────────────────────────────── */
+html[data-theme="storm"] body {
+  background-image:
+    radial-gradient(ellipse 100% 100% at 50% 50%, transparent 40%, hsl(222 30% 5% / 0.5) 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="storm"]::before {
+    background: radial-gradient(
+      ellipse 70% 50% at 25% 30%,
+      hsl(224 40% 22% / 0.12) 0%,
+      transparent 70%
+    );
+    animation: storm-drift 18s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes storm-drift {
+  0%   { opacity: 0.4; transform: translate(0,    0);   }
+  50%  { opacity: 0.8; transform: translate(3%,  2%);   }
+  100% { opacity: 0.5; transform: translate(-2%, 1%);   }
+}
+
+/* ─── Nautical — subtle horizon shimmer ─────────────────────────────────────── */
+html[data-theme="nautical"] body {
+  background-image: radial-gradient(
+    ellipse 100% 40% at 50% 100%,
+    hsl(210 50% 80% / 0.15) 0%,
+    transparent 70%
+  );
+}
+
+/* ─── Autumn — warm ember glow ──────────────────────────────────────────────── */
+html[data-theme="autumn"] body {
+  background-image: radial-gradient(
+    ellipse 80% 50% at 50% 100%,
+    hsl(22 60% 50% / 0.10) 0%,
+    transparent 65%
+  );
+}
+
+/* ─── Reduce-effects: disable all decorative layers ────────────────────────── */
+html.reduce-effects::before,
+html.reduce-effects::after,
+html.reduce-effects body {
+  background-image: none !important;
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme]::before,
+  html[data-theme]::after {
+    animation: none !important;
+  }
+}
+
+/* ─── Smooth theme transition ──────────────────────────────────────────────── */
+html {
+  transition:
+    background-color 0.4s ease,
+    color 0.4s ease;
+}
+body {
+  transition:
+    background-color 0.4s ease,
+    color 0.4s ease;
+}

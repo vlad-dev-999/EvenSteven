@@ -35,7 +35,10 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn, formatCurrency } from '@/lib/utils';
-import { ArrowRight, Users, TrendingUp, CheckCircle, KeyRound, MoreHorizontal } from 'lucide-react';
+import { ArrowRight, Users, TrendingUp, CheckCircle, KeyRound, MoreHorizontal, Loader2 } from 'lucide-react';
+import { useThemeContext } from '@/themes/context';
+import { THEMES, THEME_LABELS, MODE_LABELS, MODE_DESCRIPTIONS } from '@/themes/index';
+import type { ThemeMode } from '@/themes/index';
 
 const CREST_OPTIONS = [
   { value: 'home', label: '🏠' },
@@ -1008,6 +1011,82 @@ function EventsTab({ hostToken }: { hostToken: string }) {
   );
 }
 
+// ─── Appearance Section ────────────────────────────────────────────────────────
+function AppearanceSection() {
+  const { settings, resolvedTheme, weatherLoading, updateSettings } = useThemeContext();
+
+  const modes: ThemeMode[] = ['classic', 'seasonal', 'weather', 'manual'];
+
+  return (
+    <div className="space-y-4">
+
+      {/* Mode selection */}
+      <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Theme Mode</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Controls how the application chooses its look.</p>
+        </div>
+        <div className="space-y-2">
+          {modes.map(mode => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => updateSettings({ ...settings, mode })}
+              className={cn(
+                'w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-colors',
+                settings.mode === mode
+                  ? 'border-primary bg-primary/6'
+                  : 'border-border bg-background hover:bg-muted/40',
+              )}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">{MODE_LABELS[mode]}</p>
+                <p className="text-xs text-muted-foreground leading-snug mt-0.5">{MODE_DESCRIPTIONS[mode]}</p>
+              </div>
+              {settings.mode === mode && (
+                weatherLoading && mode === 'weather'
+                  ? <Loader2 size={15} className="text-primary shrink-0 animate-spin" />
+                  : <CheckCircle size={15} className="text-primary shrink-0" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Manual theme picker — only shown when mode is 'manual' */}
+      {settings.mode === 'manual' && (
+        <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Theme</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {THEMES.map(theme => (
+              <button
+                key={theme}
+                type="button"
+                onClick={() => updateSettings({ ...settings, manualTheme: theme })}
+                className={cn(
+                  'px-3 py-2.5 rounded-lg border text-sm font-medium text-center transition-colors',
+                  settings.manualTheme === theme
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-background text-foreground hover:bg-muted/40',
+                )}
+              >
+                {THEME_LABELS[theme]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Active theme indicator */}
+      <p className="text-xs text-muted-foreground text-center">
+        {weatherLoading
+          ? 'Fetching local weather…'
+          : <>Active theme: <span className="font-medium text-foreground">{THEME_LABELS[resolvedTheme]}</span></>}
+      </p>
+    </div>
+  );
+}
+
 // ─── Settings Tab ──────────────────────────────────────────────────────────────
 function SettingsTab({ hostToken }: { hostToken: string }) {
   const [note, setNote] = useState('');
@@ -1047,6 +1126,13 @@ function SettingsTab({ hostToken }: { hostToken: string }) {
 
   return (
     <div className="space-y-6">
+      {/* ── Appearance ── */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">Appearance</p>
+        <AppearanceSection />
+      </div>
+
+      {/* ── Skipper's Note ── */}
       <form onSubmit={handleSave} className="space-y-4">
         <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-3">
           <div>
