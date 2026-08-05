@@ -95,6 +95,21 @@ export default function ExpensesPage() {
                     <p className="text-xs text-muted-foreground">
                       {expense.paidByMemberName} · {formatDate(expense.createdAt.toString())}
                     </p>
+                    {expense.splitType === 'everyone' && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        Everyone · {expense.participants.length} attendees
+                      </p>
+                    )}
+                    {expense.splitType === 'families' && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        By House
+                      </p>
+                    )}
+                    {expense.splitType === 'members' && expense.participants.length > 0 && (
+                      <p className="text-xs text-muted-foreground/60 mt-0.5">
+                        Selected Members · {expense.participants.length} attendees
+                      </p>
+                    )}
                   </div>
                   <span className="text-sm font-semibold text-foreground tabular-nums">
                     {formatCurrency(expense.amount)}
